@@ -1,0 +1,6 @@
+-- config for supabase CLI (optional)
+project_id = "meals-personalization"
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed/seed.sql"]

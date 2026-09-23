@@ -1,0 +1,34 @@
+{
+  "name": "personalization-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "ingest:spoonacular": "tsx scripts/ingest-spoonacular.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.1",
+    "@hono/swagger-ui": "^0.6.1",
+    "@hono/zod-openapi": "^0.19.10",
+    "@mastra/core": "1.68.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "dotenv": "^16.4.5",
+    "hono": "^4.13.8",
+    "hono-pino": "^0.10.3",
+    "pino": "^10.3.1",
+    "pino-pretty": "^13.1.3",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.4",
+    "vitest": "^3.0.5"
+  }
+}
