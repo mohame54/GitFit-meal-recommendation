@@ -266,6 +266,39 @@ export class ConversationStateService {
     return messages;
   }
 
+  /**
+   * Build messages for a specialist agent from its own history/summary.
+   * Used by route-to-agent so multi-turn specialist flows keep context.
+   */
+  buildAgentMessages(
+    state: ConversationState,
+    agentId: AgentId,
+  ): Array<{
+    role: "system" | "user" | "assistant";
+    content: string;
+  }> {
+    const history = state.histories[agentId];
+    const systemParts: string[] = [];
+
+    if (state.userId) {
+      systemParts.push(
+        `Trusted userId for this conversation: ${state.userId}. ` +
+          "Use this UUID for all tools that require a userId. " +
+          "Do not ask the user for their ID unless a different user is needed.",
+      );
+    }
+
+    systemParts.push(
+      `Conversation sessionId: ${state.sessionId}. ` +
+        `You are ${agentId}. Continue this specialist thread coherently.`,
+    );
+
+    return this.summarizer.toModelMessages(history, {
+      systemPrefix: systemParts.join(" "),
+      lastAnswer: state.lastAnswer,
+    });
+  }
+
   clearSession(sessionId: string): boolean {
     return this.store.delete(sessionId);
   }
@@ -287,8 +320,38 @@ export class ConversationStateService {
   }
 }
 
+function pickTargetAgentId(value: unknown): AgentId | null {
+  if (!value || typeof value !== "object") return null;
+  const rec = value as Record<string, unknown>;
+  const candidates = [
+    rec.targetAgentId,
+    rec.agentId,
+    // Nested shapes Mastra may wrap around tool args / results
+    typeof rec.args === "object" && rec.args
+      ? (rec.args as Record<string, unknown>).targetAgentId
+      : null,
+    typeof rec.input === "object" && rec.input
+      ? (rec.input as Record<string, unknown>).targetAgentId
+      : null,
+    typeof rec.result === "object" && rec.result
+      ? (rec.result as Record<string, unknown>).targetAgentId
+      : null,
+    typeof rec.output === "object" && rec.output
+      ? (rec.output as Record<string, unknown>).targetAgentId
+      : null,
+  ];
+
+  for (const raw of candidates) {
+    if (typeof raw !== "string") continue;
+    const agentId = resolveAgentId(raw);
+    if (agentId && agentId !== "main-router-agent") return agentId;
+  }
+  return null;
+}
+
 /**
  * Best-effort mapping from Mastra supervisor toolCalls to a specialist id.
+ * Supports built-in agent-* tool names and the explicit route-to-agent tool.
  */
 export function inferSpecialistFromToolCalls(toolCalls: unknown): AgentId | null {
   if (!Array.isArray(toolCalls) || toolCalls.length === 0) return null;
@@ -297,17 +360,22 @@ export function inferSpecialistFromToolCalls(toolCalls: unknown): AgentId | null
     if (!call || typeof call !== "object") continue;
     const rec = call as Record<string, unknown>;
     const payload = (rec.payload ?? rec) as Record<string, unknown>;
+
+    const fromTarget = pickTargetAgentId(payload) ?? pickTargetAgentId(rec);
+    if (fromTarget) return fromTarget;
+
     const candidates = [
       payload.toolName,
       payload.name,
       payload.tool,
       rec.toolName,
       rec.name,
-      typeof payload.agentId === "string" ? payload.agentId : null,
     ];
 
     for (const raw of candidates) {
       if (typeof raw !== "string") continue;
+      // route-to-agent alone is not a specialist; keep scanning for targetAgentId
+      if (/route[-_]?to[-_]?agent/i.test(raw)) continue;
       const agentId = resolveAgentId(raw);
       if (agentId) return agentId;
     }

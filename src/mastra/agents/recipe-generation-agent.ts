@@ -14,5 +14,5 @@ export const recipeGenerationAgent = new Agent({
   instructions: `
 ${prompts.recipeGeneration}
 `,
-  model: env.generationLLM.modelId,
+  model: env.recipeGenerationLLM.modelId,
 });

@@ -5,14 +5,16 @@ import { submitOnboardingTool } from "./submit-onboarding-tool.js";
 import { updateProfileTool } from "./update-profile-tool.js";
 
 /**
- * Single source of truth for every tool available to agents.
- * To extend the agent with a new capability:
+ * Shared tools for specialist agents (e.g. nutritionAgent).
+ * To extend:
  *   1. Create src/mastra/tools/your-new-tool.ts using createTool()
- *   2. Import and add it below
- * Nothing else needs to change — the agent picks up new tools automatically.
+ *   2. Import and add it below (or register only on a specific agent)
+ *
+ * Note: route-to-agent is registered only on mainRouterAgent — do not add it
+ * here, or you create a circular import with the specialist agents.
  *
  * Specialists may still use a subset (e.g. onboardingAgent only gets
- * submitOnboardingTool; mainRouterAgent only gets updateProfileTool).
+ * submitOnboardingTool; mainRouterAgent gets routeToAgentTool + updateProfileTool).
  */
 export const tools = {
   getRecommendationsTool,

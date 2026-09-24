@@ -1,3 +1,4 @@
+import { RequestContext } from "@mastra/core/request-context";
 import type { ApiRouterHandler } from "../../lib/create-router.js";
 import { HttpCodes } from "../../types/https-codes.js";
 import { parseEnv } from "../../env-parser.js";
@@ -11,10 +12,11 @@ import {
   ConversationSessionUserMismatchError,
   ConversationSessionUserRequiredError,
   conversationStateService,
+  inferSpecialistFromToolCalls,
 } from "../../services/conversation.js";
 import { ChatRoute } from "./agent.routes.js";
 import type { ChatMessage, ChatSuccessResponseBody } from "./agent.schemas.js";
-import type { AgentId, ConversationState } from "../../mastra/conversation/types.js";
+import type { ConversationState } from "../../mastra/conversation/types.js";
 
 function latestUserContent(body: {
   message?: string;
@@ -88,43 +90,27 @@ export const chatHandler: ApiRouterHandler<typeof ChatRoute> = async (c) => {
     const generateMessages = conversationStateService.buildRouterMessages(
       state,
     ) as Parameters<typeof agent.generate>[0];
-    let lastDelegatedAgentId: AgentId | null = null;
+
+    const requestContext = new RequestContext();
+    requestContext.setRaw("sessionId", state.sessionId);
 
     const response = await agent.generate(generateMessages, {
       modelSettings: {
         temperature: env.LLM_TEMPERATURE ?? 0.0,
         maxOutputTokens: env.LLM_MAX_TOKENS ?? 1000,
       },
-      delegation: {
-        onDelegationStart: ({ primitiveId, primitiveType, prompt }) => {
-          const recorded = conversationStateService.recordDelegationStart(state, {
-            primitiveId,
-            primitiveType,
-            prompt,
-          });
-          if (recorded) {
-            state = recorded.state;
-            lastDelegatedAgentId = recorded.agentId;
-          }
-        },
-        onDelegationComplete: ({ primitiveId, primitiveType, result }) => {
-          const recorded = conversationStateService.recordDelegationComplete(state, {
-            primitiveId,
-            primitiveType,
-            text: result.text,
-          });
-          if (recorded) {
-            state = recorded.state;
-            lastDelegatedAgentId = recorded.agentId;
-          }
-        },
-      },
+      requestContext,
     });
 
+    // Re-sync after route-to-agent tool wrote specialist history mid-generate.
+    state = conversationStateService.getSession(state.sessionId) ?? state;
+
+    const routed = inferSpecialistFromToolCalls(response.toolCalls);
     state = conversationStateService.recordAssistantAnswer(state, response.text, {
-      specialisedAgentId: lastDelegatedAgentId,
+      specialisedAgentId: routed,
       toolCalls: response.toolCalls,
-      mirrorToSpecialist: lastDelegatedAgentId == null,
+      // Tool already recorded the specialist's real reply; avoid double-write.
+      mirrorToSpecialist: routed == null,
     });
 
     const recent = state.histories["main-router-agent"].messages

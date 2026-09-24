@@ -3,14 +3,36 @@ import { z } from "zod";
 import { NodeEnv, LogLevel, LLMProvider } from "./types/enums.js";
 import { resolveLLM } from "./lib/llm-config.js";
 
+/** Docker and Cloud Run set NODE_ENV=production; this app stores prod | dev. */
+function normalizeNodeEnv(value: unknown): unknown {
+  if (value === undefined || value === null || value === "") {
+    return NodeEnv.DEVELOPMENT;
+  }
+  if (typeof value !== "string") return value;
+
+  switch (value.trim().toLowerCase()) {
+    case "production":
+    case "prod":
+      return NodeEnv.PRODUCTION;
+    case "development":
+    case "dev":
+      return NodeEnv.DEVELOPMENT;
+    default:
+      return value;
+  }
+}
+
 const envSchema = z.object({
-  PORT: z.coerce.number().default(3000),
-  NODE_ENV: z.nativeEnum(NodeEnv).default(NodeEnv.DEVELOPMENT),
+  PORT: z.coerce.number().default(8000),
+  NODE_ENV: z.preprocess(normalizeNodeEnv, z.nativeEnum(NodeEnv)),
   LOG_LEVEL: z.nativeEnum(LogLevel).optional(),
   /** Optional override when model name alone is ambiguous (e.g. Azure). */
   LLM_PROVIDER: z.nativeEnum(LLMProvider).optional(),
   NUTRIENT_LLM_NAME: z.string().trim().min(1),
   FEEDBACK_LLM_NAME: z.string().trim().min(1),
+  MAIN_AGENT_LLM_NAME: z.string().trim().min(1),
+  ONBOARDING_AGENT_LLM_NAME: z.string().trim().min(1),
+  RECIPE_GENERATION_LLM_NAME: z.string().trim().min(1),
   GENERATION_LLM_NAME: z.string().trim().min(1).optional(),
   LLM_TEMPERATURE: z.coerce.number().optional(),
   LLM_MAX_TOKENS: z.coerce.number().optional(),
@@ -31,7 +53,9 @@ const envSchema = z.object({
 export type AppConfig = z.infer<typeof envSchema> & {
   nutrientLLM: ReturnType<typeof resolveLLM>;
   feedbackLLM: ReturnType<typeof resolveLLM>;
-  generationLLM: ReturnType<typeof resolveLLM>;
+  recipeGenerationLLM: ReturnType<typeof resolveLLM>;
+  mainAgentLLM: ReturnType<typeof resolveLLM>;
+  onboardingAgentLLM: ReturnType<typeof resolveLLM>;
 };
 
 let cached: AppConfig | null = null;
@@ -43,7 +67,10 @@ export function parseEnv(): AppConfig {
 
   const parsed = envSchema.safeParse(process.env);
   if (!parsed.success) {
-    console.error("Error parsing environment variables:", parsed.error.format());
+    const details = parsed.error.issues
+      .map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`)
+      .join("\n");
+    console.error(`Error parsing environment variables:\n${details}`);
     process.exit(1);
   }
 
@@ -52,8 +79,16 @@ export function parseEnv(): AppConfig {
   try {
     const nutrientLLM = resolveLLM(data.NUTRIENT_LLM_NAME, data.LLM_PROVIDER);
     const feedbackLLM = resolveLLM(data.FEEDBACK_LLM_NAME, data.LLM_PROVIDER);
-    const generationLLM = resolveLLM(
+    const recipeGenerationLLM = resolveLLM(
       data.GENERATION_LLM_NAME ?? data.NUTRIENT_LLM_NAME,
+      data.LLM_PROVIDER,
+    );
+    const mainAgentLLM = resolveLLM(
+      data.MAIN_AGENT_LLM_NAME ?? data.GENERATION_LLM_NAME,
+      data.LLM_PROVIDER,
+    );
+    const onboardingAgentLLM = resolveLLM(
+      data.ONBOARDING_AGENT_LLM_NAME ?? data.GENERATION_LLM_NAME,
       data.LLM_PROVIDER,
     );
 
@@ -61,7 +96,9 @@ export function parseEnv(): AppConfig {
       ...data,
       nutrientLLM,
       feedbackLLM,
-      generationLLM,
+      recipeGenerationLLM,
+      mainAgentLLM,
+      onboardingAgentLLM,
     };
     return cached;
   } catch (err) {

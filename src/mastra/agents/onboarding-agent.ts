@@ -13,7 +13,7 @@ export const onboardingAgent = new Agent({
     "(diet, allergies, cuisines, meal types) and saves results when they finish. " +
     "Use when the user is new, wants to set preferences, or complete onboarding.",
   instructions: onboardingAgentPrompt,
-  model: env.nutrientLLM.modelId,
+  model: env.onboardingAgentLLM.modelId,
   tools: {
     submitOnboardingTool,
   },

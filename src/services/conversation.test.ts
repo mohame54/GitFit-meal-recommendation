@@ -103,6 +103,49 @@ describe("ConversationStateService", () => {
     ]);
     expect(state.lastAnswerAgentId).toBe("onboarding-agent");
   });
+
+  it("buildAgentMessages includes specialist history and trusted userId", () => {
+    let state = service.ensureSession({
+      userId: "00000000-0000-4000-8000-000000000001",
+    });
+
+    const start = service.recordDelegationStart(state, {
+      primitiveId: "onboarding-agent",
+      primitiveType: "agent",
+      prompt: "Ask step 1 diet preferences",
+    });
+    state = start!.state;
+
+    const complete = service.recordDelegationComplete(state, {
+      primitiveId: "onboarding-agent",
+      primitiveType: "agent",
+      text: "Do you follow any of these diets?",
+    });
+    state = complete!.state;
+
+    state = service.recordAssistantAnswer(state, "Do you follow any of these diets?", {
+      specialisedAgentId: "onboarding-agent",
+      mirrorToSpecialist: false,
+    });
+
+    const msgs = service.buildAgentMessages(state, "onboarding-agent");
+    const systemBlob = msgs
+      .filter((m) => m.role === "system")
+      .map((m) => m.content)
+      .join("\n");
+
+    expect(systemBlob).toContain("00000000-0000-4000-8000-000000000001");
+    expect(systemBlob).toContain("onboarding-agent");
+    expect(systemBlob).toContain("Do you follow any of these diets?");
+    expect(
+      msgs.some((m) => m.role === "user" && m.content === "Ask step 1 diet preferences"),
+    ).toBe(true);
+    expect(
+      msgs.some(
+        (m) => m.role === "assistant" && m.content === "Do you follow any of these diets?",
+      ),
+    ).toBe(true);
+  });
 });
 
 describe("inferSpecialistFromToolCalls", () => {
@@ -114,5 +157,43 @@ describe("inferSpecialistFromToolCalls", () => {
       "nutrition-agent",
     );
     expect(inferSpecialistFromToolCalls([])).toBeNull();
+  });
+
+  it("maps route-to-agent tool args/result to the target specialist", () => {
+    expect(
+      inferSpecialistFromToolCalls([
+        {
+          toolName: "route-to-agent",
+          args: {
+            targetAgentId: "onboarding-agent",
+            message: "Start diet step",
+          },
+        },
+      ]),
+    ).toBe("onboarding-agent");
+
+    expect(
+      inferSpecialistFromToolCalls([
+        {
+          name: "route-to-agent",
+          result: {
+            targetAgentId: "nutrition-agent",
+            text: "Here are some meals",
+          },
+        },
+      ]),
+    ).toBe("nutrition-agent");
+
+    expect(
+      inferSpecialistFromToolCalls([
+        {
+          toolName: "route-to-agent",
+          payload: {
+            toolName: "route-to-agent",
+            args: { targetAgentId: "recipe-generation-agent", message: "Make pasta" },
+          },
+        },
+      ]),
+    ).toBe("recipe-generation-agent");
   });
 });
