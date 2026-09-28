@@ -3,7 +3,8 @@ import { HttpCodes } from "../../types/https-codes.js";
 import {
   MissingUserIdError,
   UserIdMismatchError,
-  resolveUserId,
+  assertOptionalUserIdMatches,
+  requireUserId,
 } from "../../middlewares/auth.js";
 import {
   getFeedbackHistory,
@@ -19,12 +20,16 @@ export const getRecommendationHistoryHandler: ApiRouterHandler<
 > = async (c) => {
   const query = c.req.valid("query");
   try {
-    const userId = resolveUserId(c.get("userId"), query.userId);
+    const userId = requireUserId(c.get("userId"));
+    assertOptionalUserIdMatches(userId, query.userId);
     const history = await getRecommendationHistory(userId, query.limit ?? 20);
     return c.json(history, HttpCodes.OK);
   } catch (err) {
-    if (err instanceof MissingUserIdError || err instanceof UserIdMismatchError) {
-      return c.json({ error: err.message }, HttpCodes.BAD_REQUEST);
+    if (err instanceof UserIdMismatchError) {
+      return c.json({ error: err.message }, HttpCodes.FORBIDDEN);
+    }
+    if (err instanceof MissingUserIdError) {
+      return c.json({ error: err.message }, HttpCodes.UNAUTHORIZED);
     }
     c.var.logger.error({ err }, "Failed to get recommendation history");
     return c.json(
@@ -39,12 +44,16 @@ export const getFeedbackHistoryHandler: ApiRouterHandler<typeof GetFeedbackHisto
 ) => {
   const query = c.req.valid("query");
   try {
-    const userId = resolveUserId(c.get("userId"), query.userId);
+    const userId = requireUserId(c.get("userId"));
+    assertOptionalUserIdMatches(userId, query.userId);
     const history = await getFeedbackHistory(userId, query.limit ?? 20);
     return c.json(history, HttpCodes.OK);
   } catch (err) {
-    if (err instanceof MissingUserIdError || err instanceof UserIdMismatchError) {
-      return c.json({ error: err.message }, HttpCodes.BAD_REQUEST);
+    if (err instanceof UserIdMismatchError) {
+      return c.json({ error: err.message }, HttpCodes.FORBIDDEN);
+    }
+    if (err instanceof MissingUserIdError) {
+      return c.json({ error: err.message }, HttpCodes.UNAUTHORIZED);
     }
     c.var.logger.error({ err }, "Failed to get feedback history");
     return c.json({ error: "Failed to get feedback history" }, HttpCodes.INTERNAL_SERVER_ERROR);

@@ -2,6 +2,7 @@ import { createRoute } from "@hono/zod-openapi";
 import { HttpCodes } from "../../types/https-codes.js";
 import {
   ErrorResponseBodySchema,
+  authErrorResponses,
   jsonContent,
   jsonContentRequired,
 } from "../../lib/helpers.js";
@@ -37,6 +38,7 @@ export const GetProfileRoute = createRoute({
   responses: {
     [HttpCodes.OK]: jsonContent(ProfileSchema, "Profile"),
     [HttpCodes.BAD_REQUEST]: jsonContent(ErrorResponseBodySchema, "Bad request"),
+    ...authErrorResponses,
     [HttpCodes.NOT_FOUND]: jsonContent(ErrorResponseBodySchema, "Not found"),
     [HttpCodes.INTERNAL_SERVER_ERROR]: jsonContent(
       ErrorResponseBodySchema,
@@ -56,6 +58,7 @@ export const UpdateProfileRoute = createRoute({
   responses: {
     [HttpCodes.OK]: jsonContent(ProfileSchema, "Updated profile"),
     [HttpCodes.BAD_REQUEST]: jsonContent(ErrorResponseBodySchema, "Bad request"),
+    ...authErrorResponses,
     [HttpCodes.INTERNAL_SERVER_ERROR]: jsonContent(
       ErrorResponseBodySchema,
       "Internal server error",

@@ -2,6 +2,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { HttpCodes } from "../../types/https-codes.js";
 import {
   ErrorResponseBodySchema,
+  authErrorResponses,
   jsonContent,
   jsonContentRequired,
 } from "../../lib/helpers.js";
@@ -20,6 +21,7 @@ export const ListPreferencesRoute = createRoute({
   responses: {
     [HttpCodes.OK]: jsonContent(z.array(PreferenceSchema), "User preferences"),
     [HttpCodes.BAD_REQUEST]: jsonContent(ErrorResponseBodySchema, "Bad request"),
+    ...authErrorResponses,
     [HttpCodes.INTERNAL_SERVER_ERROR]: jsonContent(
       ErrorResponseBodySchema,
       "Internal server error",
@@ -37,6 +39,7 @@ export const UpsertPreferenceRoute = createRoute({
   responses: {
     [HttpCodes.CREATED]: jsonContent(PreferenceSchema, "Upserted preference"),
     [HttpCodes.BAD_REQUEST]: jsonContent(ErrorResponseBodySchema, "Bad request"),
+    ...authErrorResponses,
     [HttpCodes.INTERNAL_SERVER_ERROR]: jsonContent(
       ErrorResponseBodySchema,
       "Internal server error",
@@ -52,6 +55,7 @@ export const DeletePreferenceRoute = createRoute({
   responses: {
     [HttpCodes.OK]: jsonContent(z.object({ status: z.literal("ok") }), "Deleted"),
     [HttpCodes.BAD_REQUEST]: jsonContent(ErrorResponseBodySchema, "Bad request"),
+    ...authErrorResponses,
     [HttpCodes.INTERNAL_SERVER_ERROR]: jsonContent(
       ErrorResponseBodySchema,
       "Internal server error",

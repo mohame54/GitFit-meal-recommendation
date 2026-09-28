@@ -17,11 +17,20 @@ export class ConversationStateStore {
   getOrCreate(params: {
     sessionId: string;
     userId?: string | null;
+    authUserId?: string | null;
   }): ConversationState {
     const existing = this.sessions.get(params.sessionId);
     if (existing) {
+      let touched = false;
       if (params.userId && !existing.userId) {
         existing.userId = params.userId;
+        touched = true;
+      }
+      if (params.authUserId && !existing.authUserId) {
+        existing.authUserId = params.authUserId;
+        touched = true;
+      }
+      if (touched) {
         existing.updatedAt = new Date().toISOString();
       }
       return existing;

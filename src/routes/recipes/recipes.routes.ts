@@ -1,6 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { HttpCodes } from "../../types/https-codes.js";
-import { ErrorResponseBodySchema, jsonContent } from "../../lib/helpers.js";
+import { ErrorResponseBodySchema, authErrorResponses, jsonContent } from "../../lib/helpers.js";
 import { RecipeResponseBodySchema } from "../recommendations/recommendations.schemas.js";
 import {
   ListRecipesQuerySchema,
@@ -30,6 +30,7 @@ export const GetRecipeRoute = createRoute({
   responses: {
     [HttpCodes.OK]: jsonContent(RecipeDetailSchema, "Recipe detail"),
     [HttpCodes.NOT_FOUND]: jsonContent(ErrorResponseBodySchema, "Not found"),
+    ...authErrorResponses,
     [HttpCodes.INTERNAL_SERVER_ERROR]: jsonContent(
       ErrorResponseBodySchema,
       "Internal server error",

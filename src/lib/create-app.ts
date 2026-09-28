@@ -1,16 +1,38 @@
 import { swaggerUI } from "@hono/swagger-ui";
+import { cors } from "hono/cors";
 import notFound from "../middlewares/notfound.js";
 import onError from "../middlewares/error.js";
 import { createLogger } from "../middlewares/loggers.js";
-import { apiKeyAuth, userContext } from "../middlewares/auth.js";
+import { apiKeyAuth, supabaseJwtAuth } from "../middlewares/auth.js";
+import { parseEnv } from "../env-parser.js";
 import { createRouter } from "./create-router.js";
+
+function corsOrigin(): string | string[] | ((origin: string) => string | undefined | null) {
+  const { CORS_ORIGINS } = parseEnv();
+  if (!CORS_ORIGINS?.trim()) {
+    return (origin: string) => origin || undefined;
+  }
+  const allowed = CORS_ORIGINS.split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
+  return (origin: string) => (allowed.includes(origin) ? origin : undefined);
+}
 
 export default function createApp() {
   const app = createRouter();
 
+  app.use(
+    "*",
+    cors({
+      origin: corsOrigin(),
+      allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+      allowHeaders: ["Authorization", "Content-Type", "X-Api-Key"],
+      credentials: false,
+    }),
+  );
   app.use(createLogger());
   app.use("*", apiKeyAuth);
-  app.use("*", userContext);
+  app.use("*", supabaseJwtAuth);
 
   app.doc("/doc", {
     openapi: "3.0.0",
@@ -19,7 +41,9 @@ export default function createApp() {
       version: "1.0.0",
       description:
         "Personalization, recommendation, and AI-generation engine for meals. " +
-        "Send X-Api-Key when API_KEY is configured, and prefer X-User-Id for trusted identity.",
+        "Send Authorization: Bearer <Supabase access token> on user routes. " +
+        "Send X-Api-Key when API_KEY is configured. " +
+        "POST /api/profiles is a service-key path (no user JWT).",
     },
     tags: [
       { name: "General", description: "General and health endpoints" },

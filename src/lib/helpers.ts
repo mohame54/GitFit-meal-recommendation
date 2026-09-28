@@ -1,5 +1,6 @@
 import { z } from "@hono/zod-openapi";
 import type { ZodType } from "zod";
+import { HttpCodes } from "../types/https-codes.js";
 
 export const jsonContent = <T extends ZodType>(schema: T, description: string) => ({
   content: {
@@ -25,3 +26,9 @@ export const ErrorResponseBodySchema = z
     error: z.string(),
   })
   .openapi("ErrorResponseBody");
+
+/** Shared OpenAPI responses for JWT / identity failures. */
+export const authErrorResponses = {
+  [HttpCodes.UNAUTHORIZED]: jsonContent(ErrorResponseBodySchema, "Unauthorized"),
+  [HttpCodes.FORBIDDEN]: jsonContent(ErrorResponseBodySchema, "Forbidden"),
+} as const;

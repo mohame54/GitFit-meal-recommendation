@@ -39,10 +39,39 @@ const envSchema = z.object({
   SUPABASE_URL: z.string().min(1),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   /**
+   * Comma-separated JWT `alg` values this API accepts (e.g. ES256 for ECC P-256).
+   * Defaults to ES256. Token headers must match one of these before verification.
+   */
+  SUPABASE_JWT_ALGORITHMS: z
+    .string()
+    .trim()
+    .min(1)
+    .default("ES256")
+    .transform((raw) => {
+      const algs = raw
+        .split(",")
+        .map((a) => a.trim().toUpperCase())
+        .filter(Boolean);
+      if (algs.length === 0) {
+        throw new Error("SUPABASE_JWT_ALGORITHMS must list at least one algorithm");
+      }
+      return algs;
+    }),
+  /**
+   * JWT secret for HS256 Supabase access tokens (local / legacy projects).
+   * Asymmetric tokens (ES256/RS256) verify via the project's JWKS instead.
+   */
+  SUPABASE_JWT_SECRET: z.string().trim().min(1).optional(),
+  /**
    * When set, every request (except /health and OpenAPI UI) must send
    * matching X-Api-Key. Leave unset for local demos.
    */
   API_KEY: z.string().trim().min(1).optional(),
+  /**
+   * Comma-separated browser origins allowed by CORS.
+   * When unset, the request Origin is echoed (dev-friendly).
+   */
+  CORS_ORIGINS: z.string().optional(),
   /**
    * Only required for Spoonacular ingestion endpoints/scripts.
    * Runtime recommendations read from the local Postgres cache.

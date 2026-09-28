@@ -2,6 +2,7 @@ import { createRoute } from "@hono/zod-openapi";
 import { HttpCodes } from "../../types/https-codes.js";
 import {
   ErrorResponseBodySchema,
+  authErrorResponses,
   jsonContent,
   jsonContentRequired,
 } from "../../lib/helpers.js";
@@ -29,7 +30,7 @@ export const ChatRoute = createRoute({
   responses: {
     [HttpCodes.OK]: jsonContent(ChatSuccessResponseBodySchema, "Agent chat response"),
     [HttpCodes.BAD_REQUEST]: jsonContent(ErrorResponseBodySchema, "Bad request"),
-    [HttpCodes.FORBIDDEN]: jsonContent(ErrorResponseBodySchema, "Forbidden"),
+    ...authErrorResponses,
     [HttpCodes.INTERNAL_SERVER_ERROR]: jsonContent(
       ErrorResponseBodySchema,
       "Internal server error",

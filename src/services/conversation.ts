@@ -53,7 +53,7 @@ export class ConversationSessionUserMismatchError extends Error {
 
 export class ConversationSessionUserRequiredError extends Error {
   constructor(sessionId: string) {
-    super(`Session ${sessionId} is bound to a user; pass a matching userId or X-User-Id`);
+    super(`Session ${sessionId} is bound to a user; pass a matching Authorization Bearer token`);
     this.name = "ConversationSessionUserRequiredError";
   }
 }
@@ -85,6 +85,7 @@ export class ConversationStateService {
   ensureSession(params: {
     sessionId?: string | null;
     userId?: string | null;
+    authUserId?: string | null;
   }): ConversationState {
     const sessionId = params.sessionId?.trim() || randomUUID();
     const existing = this.store.get(sessionId);
@@ -100,6 +101,7 @@ export class ConversationStateService {
     return this.store.getOrCreate({
       sessionId,
       userId: params.userId ?? null,
+      authUserId: params.authUserId ?? null,
     });
   }
 

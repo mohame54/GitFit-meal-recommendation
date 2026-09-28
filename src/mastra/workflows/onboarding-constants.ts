@@ -29,7 +29,10 @@ export const cuisinePreferenceSchema = z.enum(CUISINE_OPTIONS);
 export const mealTypePreferenceSchema = z.enum(MEAL_TYPE_OPTIONS);
 
 export const onboardingInputSchema = z.object({
+  /** Meals profile id — used for constraints/preferences rows. */
   userId: z.string().uuid(),
+  /** Supabase Auth user id (`sub`) — used for auth.admin metadata updates. */
+  authUserId: z.string().uuid(),
   dietaryConstraints: z.array(dietaryConstraintSchema).default([]),
   allergies: z.array(z.string().trim().min(1)).default([]),
   cuisines: z.array(cuisinePreferenceSchema).default([]),

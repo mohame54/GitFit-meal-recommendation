@@ -12,14 +12,20 @@ Every request and response body is JSON. Send `Content-Type: application/json` o
 const BASE_URL = "http://localhost:3000";
 
 async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    throw new Error("Not signed in");
+  }
+
   const response = await fetch(`${BASE_URL}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
+      Authorization: `Bearer ${session.access_token}`,
       // Required only when the server has API_KEY set.
       // "X-Api-Key": import.meta.env.VITE_API_KEY,
-      // Send this on every user-scoped call once you have a profile id.
-      "X-User-Id": currentUserId,
       ...init.headers,
     },
   });
@@ -38,15 +44,22 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 ```
 
-The server does not send CORS headers. A browser app on another origin (for example Vite on port 5173) cannot call `localhost:3000` directly. Proxy `/api` through the frontend dev server, or call the API from your own backend.
+CORS allows `Authorization`, `Content-Type`, and `X-Api-Key`. Set `CORS_ORIGINS` to a comma-separated allow-list in production; when unset, the server echoes the request `Origin`.
 
 ### Identity
 
-Create a profile first and keep `id`. That UUID is the user for every other call.
+User routes require `Authorization: Bearer <Supabase access token>`. The server verifies the JWT and reads:
 
-Prefer the `X-User-Id` header. You can also pass `userId` in the query string or JSON body. If you send both, they must be the same string, or the API returns `400`.
+- `sub` — Supabase Auth user id
+- `user_metadata.meals_profile_id` — meals profile id used for all user-scoped data
 
-Seeded demo user (after `supabase/seed/seed.sql`): `00000000-0000-0000-0000-000000000001`.
+`X-User-Id` is no longer accepted. Optional body/query `userId` must match the token profile id when present (otherwise `403`).
+
+`POST /api/profiles` is a service-key path used by the auth Edge Function before a user session exists. It does not require a Bearer token (only `X-Api-Key` when `API_KEY` is set).
+
+`GET` / `PATCH /api/profiles/{userId}` require the path id to equal `meals_profile_id` or the API returns `403`.
+
+Seeded demo user (after `supabase/seed/seed.sql`): `00000000-0000-0000-0000-000000000001` (still useful for local DB rows; browser clients must send a real Supabase JWT).
 
 ### API key
 
@@ -56,14 +69,17 @@ Seeded demo user (after `supabase/seed/seed.sql`): `00000000-0000-0000-0000-0000
 { "error": "Unauthorized: missing or invalid X-Api-Key" }
 ```
 
+`X-Api-Key` is an optional gateway check. The Supabase JWT is user authentication.
+
 Local demos usually leave `API_KEY` unset, so the header is optional.
 
 ### Errors
 
 | Status | When | Body |
 |--------|------|------|
-| `400` | Invalid JSON, failed validation, or missing / mismatched user id | `{ "error": "..." }` |
-| `401` | `API_KEY` is set and `X-Api-Key` does not match | `{ "error": "..." }` |
+| `400` | Invalid JSON or failed validation | `{ "error": "..." }` |
+| `401` | Missing/invalid Bearer token, missing `meals_profile_id`, or bad `X-Api-Key` | `{ "error": "..." }` |
+| `403` | Profile path or body/query `userId` does not match the token | `{ "error": "..." }` |
 | `404` | Profile or recipe does not exist | `{ "error": "..." }` |
 | `404` | Path does not exist | `{ "message": "Not Found - /the/path" }` |
 | `500` | Server or database failure | `{ "error": "..." }` or `{ "message": "..." }` |
@@ -111,7 +127,7 @@ Responses use snake_case (`display_name`, `ready_in_minutes`, `constraint_type`)
 }
 ```
 
-Use `id` as `X-User-Id` from here on.
+Use the returned `id` as `user_metadata.meals_profile_id` on the Supabase user (done by the auth Edge Function). Browser calls send the access token; the path uses that profile id.
 
 ### Read
 
@@ -168,7 +184,7 @@ Same `(constraint_type, value)` for a user updates the existing row instead of c
 }
 ```
 
-`userId` in the body is optional when `X-User-Id` is set.
+`userId` in the body is optional; when present it must match the token's `meals_profile_id`.
 
 ### Delete
 
@@ -282,7 +298,7 @@ Catalog ingest (`POST /api/recipes/ingest/ids`, `/random`, `/search`) fills the 
 
 `GET /api/recommendations?limit=5` → `200`
 
-`limit` defaults to 10. Omit `userId` when `X-User-Id` is set.
+`limit` defaults to 10. Identity comes from the Bearer token; omit query `userId` or keep it equal to `meals_profile_id`.
 
 ```json
 [
@@ -464,9 +480,9 @@ is used; history still lives on the server under `sessionId`.
 }
 ```
 
-Render `text`. Persist **`sessionId`** for the next request. If the session is
-bound to a user, every follow-up must send the same `X-User-Id` (or matching
-`userId`) or the API returns `403`. `lastAnswer` is what the router uses to
+Render `text`. Persist **`sessionId`** for the next request. Chat always
+requires a Bearer token; follow-ups must use the same authenticated meals
+profile or the API returns `403`. `lastAnswer` is what the router uses to
 interpret short replies like "yes" / "skip". `messages` is optional UI sugar
 (recent window only).
 
@@ -479,20 +495,20 @@ when you need structured cards. Use chat when the user is typing.
 |--------|------|------------|---------|
 | `GET` | `/health` | no | `200` `{ "status": "ok" }` |
 | `POST` | `/api/profiles` | no | `201` profile |
-| `GET` | `/api/profiles/{userId}` | path id | `200` profile |
-| `PATCH` | `/api/profiles/{userId}` | path id | `200` profile |
-| `GET` | `/api/constraints` | yes | `200` constraint[] |
-| `POST` | `/api/constraints` | yes | `201` constraint |
-| `DELETE` | `/api/constraints/{constraintId}` | yes | `200` `{ "status": "ok" }` |
-| `GET` | `/api/preferences` | yes | `200` preference[] |
-| `POST` | `/api/preferences` | yes | `201` preference |
-| `DELETE` | `/api/preferences` | yes | `200` `{ "status": "ok" }` |
+| `GET` | `/api/profiles/{userId}` | Bearer JWT + matching path id | `200` profile |
+| `PATCH` | `/api/profiles/{userId}` | Bearer JWT + matching path id | `200` profile |
+| `GET` | `/api/constraints` | Bearer JWT | `200` constraint[] |
+| `POST` | `/api/constraints` | Bearer JWT | `201` constraint |
+| `DELETE` | `/api/constraints/{constraintId}` | Bearer JWT | `200` `{ "status": "ok" }` |
+| `GET` | `/api/preferences` | Bearer JWT | `200` preference[] |
+| `POST` | `/api/preferences` | Bearer JWT | `201` preference |
+| `DELETE` | `/api/preferences` | Bearer JWT | `200` `{ "status": "ok" }` |
 | `GET` | `/api/recipes` | no | `200` recipe[] |
-| `GET` | `/api/recipes/{recipeId}` | no | `200` detail |
-| `GET` | `/api/recommendations` | yes | `200` `{ recipe, score }[]` |
-| `POST` | `/api/feedback` | yes | `201` `{ "status": "ok" }` |
-| `GET` | `/api/history/recommendations` | yes | `200` history[] |
-| `GET` | `/api/history/feedback` | yes | `200` feedback[] |
-| `POST` | `/api/generate` | yes | `201` generated recipe |
-| `GET` | `/api/generate` | yes | `200` generated recipe[] |
-| `POST` | `/api/agent/chat` | prefer `X-User-Id` | `200` `{ text, sessionId, lastAnswer, activeAgentId }` |
+| `GET` | `/api/recipes/{recipeId}` | Bearer JWT | `200` detail |
+| `GET` | `/api/recommendations` | Bearer JWT | `200` `{ recipe, score }[]` |
+| `POST` | `/api/feedback` | Bearer JWT | `201` `{ "status": "ok" }` |
+| `GET` | `/api/history/recommendations` | Bearer JWT | `200` history[] |
+| `GET` | `/api/history/feedback` | Bearer JWT | `200` feedback[] |
+| `POST` | `/api/generate` | Bearer JWT | `201` generated recipe |
+| `GET` | `/api/generate` | Bearer JWT | `200` generated recipe[] |
+| `POST` | `/api/agent/chat` | Bearer JWT | `200` `{ text, sessionId, lastAnswer, activeAgentId }` |

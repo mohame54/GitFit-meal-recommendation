@@ -1,6 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { HttpCodes } from "../../types/https-codes.js";
-import { ErrorResponseBodySchema, jsonContent } from "../../lib/helpers.js";
+import { ErrorResponseBodySchema, authErrorResponses, jsonContent } from "../../lib/helpers.js";
 import {
   FeedbackHistoryItemSchema,
   HistoryQuerySchema,
@@ -18,6 +18,7 @@ export const GetRecommendationHistoryRoute = createRoute({
       "Recommendation history",
     ),
     [HttpCodes.BAD_REQUEST]: jsonContent(ErrorResponseBodySchema, "Bad request"),
+    ...authErrorResponses,
     [HttpCodes.INTERNAL_SERVER_ERROR]: jsonContent(
       ErrorResponseBodySchema,
       "Internal server error",
@@ -33,6 +34,7 @@ export const GetFeedbackHistoryRoute = createRoute({
   responses: {
     [HttpCodes.OK]: jsonContent(z.array(FeedbackHistoryItemSchema), "Feedback history"),
     [HttpCodes.BAD_REQUEST]: jsonContent(ErrorResponseBodySchema, "Bad request"),
+    ...authErrorResponses,
     [HttpCodes.INTERNAL_SERVER_ERROR]: jsonContent(
       ErrorResponseBodySchema,
       "Internal server error",

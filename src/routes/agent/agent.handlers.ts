@@ -6,7 +6,8 @@ import { mastra } from "../../mastra/index.js";
 import {
   MissingUserIdError,
   UserIdMismatchError,
-  resolveUserId,
+  assertOptionalUserIdMatches,
+  requireUserId,
 } from "../../middlewares/auth.js";
 import {
   ConversationSessionUserMismatchError,
@@ -36,16 +37,18 @@ export const chatHandler: ApiRouterHandler<typeof ChatRoute> = async (c) => {
   const body = c.req.valid("json");
   const env = parseEnv();
 
-  let userId: string | undefined;
+  let userId: string;
+  let authUserId: string;
   try {
-    const headerUserId = c.get("userId");
-    const bodyUserId = body.userId;
-    if (headerUserId || bodyUserId) {
-      userId = resolveUserId(headerUserId, bodyUserId);
-    }
+    userId = requireUserId(c.get("userId"));
+    authUserId = requireUserId(c.get("authUserId"));
+    assertOptionalUserIdMatches(userId, body.userId);
   } catch (err) {
-    if (err instanceof MissingUserIdError || err instanceof UserIdMismatchError) {
-      return c.json({ error: err.message }, HttpCodes.BAD_REQUEST);
+    if (err instanceof UserIdMismatchError) {
+      return c.json({ error: err.message }, HttpCodes.FORBIDDEN);
+    }
+    if (err instanceof MissingUserIdError) {
+      return c.json({ error: err.message }, HttpCodes.UNAUTHORIZED);
     }
     throw err;
   }
@@ -62,7 +65,8 @@ export const chatHandler: ApiRouterHandler<typeof ChatRoute> = async (c) => {
   try {
     state = conversationStateService.ensureSession({
       sessionId: body.sessionId,
-      userId: userId ?? null,
+      userId,
+      authUserId,
     });
   } catch (err) {
     if (

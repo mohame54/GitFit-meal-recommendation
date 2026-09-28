@@ -92,6 +92,7 @@ export const routeToAgentTool = createTool({
       const response = await agent.generate(specialistMessages, {
         maxSteps: 5,
         modelSettings,
+        requestContext: context.requestContext,
       });
       text = response.text || "(no text returned)";
 
@@ -108,6 +109,7 @@ export const routeToAgentTool = createTool({
       const response = await agent.generate(message, {
         maxSteps: 5,
         modelSettings,
+        requestContext: context.requestContext,
       });
       text = response.text || "(no text returned)";
     }

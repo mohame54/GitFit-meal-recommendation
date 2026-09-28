@@ -1,5 +1,6 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
+import { conversationStateService } from "../../services/conversation.js";
 import {
   cuisinePreferenceSchema,
   dietaryConstraintSchema,
@@ -15,7 +16,7 @@ export const submitOnboardingTool = createTool({
     "and mark onboarding_complete in user metadata. Empty arrays mean the step was skipped. " +
     "Call only after the user confirms Finish.",
   inputSchema: z.object({
-    userId: z.string().uuid().describe("The user's UUID"),
+    userId: z.string().uuid().describe("The meals profile UUID (trusted userId from context)"),
     dietaryConstraints: z
       .array(dietaryConstraintSchema)
       .default([])
@@ -43,9 +44,25 @@ export const submitOnboardingTool = createTool({
     }),
     onboardingComplete: z.literal(true),
   }),
-  execute: async (input) => {
+  execute: async (input, context) => {
+    const sessionIdRaw = context?.requestContext?.getRaw("sessionId");
+    const sessionId =
+      typeof sessionIdRaw === "string" && sessionIdRaw.trim()
+        ? sessionIdRaw.trim()
+        : null;
+    const session = sessionId
+      ? conversationStateService.getSession(sessionId)
+      : undefined;
+    const authUserId = session?.authUserId?.trim();
+    if (!authUserId) {
+      throw new Error(
+        "Missing authUserId on conversation session; cannot mark onboarding complete",
+      );
+    }
+
     return runOnboardingWorkflow({
       userId: input.userId,
+      authUserId,
       dietaryConstraints: input.dietaryConstraints ?? [],
       allergies: normalizeAllergies(input.allergies ?? []),
       cuisines: input.cuisines ?? [],

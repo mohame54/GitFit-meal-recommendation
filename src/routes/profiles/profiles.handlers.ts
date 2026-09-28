@@ -3,7 +3,8 @@ import { HttpCodes } from "../../types/https-codes.js";
 import {
   MissingUserIdError,
   UserIdMismatchError,
-  resolveUserId,
+  assertOptionalUserIdMatches,
+  requireUserId,
 } from "../../middlewares/auth.js";
 import { createProfile, getProfile, updateProfile } from "../../services/profiles.js";
 import {
@@ -26,15 +27,19 @@ export const createProfileHandler: ApiRouterHandler<typeof CreateProfileRoute> =
 export const getProfileHandler: ApiRouterHandler<typeof GetProfileRoute> = async (c) => {
   const { userId: paramUserId } = c.req.valid("param");
   try {
-    const userId = resolveUserId(c.get("userId"), paramUserId);
+    const userId = requireUserId(c.get("userId"));
+    assertOptionalUserIdMatches(userId, paramUserId);
     const profile = await getProfile(userId);
     if (!profile) {
       return c.json({ error: "Profile not found" }, HttpCodes.NOT_FOUND);
     }
     return c.json(profile, HttpCodes.OK);
   } catch (err) {
-    if (err instanceof MissingUserIdError || err instanceof UserIdMismatchError) {
-      return c.json({ error: err.message }, HttpCodes.BAD_REQUEST);
+    if (err instanceof UserIdMismatchError) {
+      return c.json({ error: err.message }, HttpCodes.FORBIDDEN);
+    }
+    if (err instanceof MissingUserIdError) {
+      return c.json({ error: err.message }, HttpCodes.UNAUTHORIZED);
     }
     c.var.logger.error({ err, userId: paramUserId }, "Failed to get profile");
     return c.json({ error: "Failed to get profile" }, HttpCodes.INTERNAL_SERVER_ERROR);
@@ -45,12 +50,16 @@ export const updateProfileHandler: ApiRouterHandler<typeof UpdateProfileRoute> =
   const { userId: paramUserId } = c.req.valid("param");
   const body = c.req.valid("json");
   try {
-    const userId = resolveUserId(c.get("userId"), paramUserId);
+    const userId = requireUserId(c.get("userId"));
+    assertOptionalUserIdMatches(userId, paramUserId);
     const profile = await updateProfile(userId, body);
     return c.json(profile, HttpCodes.OK);
   } catch (err) {
-    if (err instanceof MissingUserIdError || err instanceof UserIdMismatchError) {
-      return c.json({ error: err.message }, HttpCodes.BAD_REQUEST);
+    if (err instanceof UserIdMismatchError) {
+      return c.json({ error: err.message }, HttpCodes.FORBIDDEN);
+    }
+    if (err instanceof MissingUserIdError) {
+      return c.json({ error: err.message }, HttpCodes.UNAUTHORIZED);
     }
     c.var.logger.error({ err, userId: paramUserId }, "Failed to update profile");
     return c.json({ error: "Failed to update profile" }, HttpCodes.INTERNAL_SERVER_ERROR);

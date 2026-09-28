@@ -17,6 +17,7 @@ describe("onboardingInputSchema", () => {
   it("allows empty arrays for skipped steps", () => {
     const parsed = onboardingInputSchema.parse({
       userId: "00000000-0000-4000-8000-000000000001",
+      authUserId: "00000000-0000-4000-8000-000000000099",
     });
     expect(parsed.dietaryConstraints).toEqual([]);
     expect(parsed.allergies).toEqual([]);
@@ -27,6 +28,7 @@ describe("onboardingInputSchema", () => {
   it("accepts canonical onboarding values", () => {
     const parsed = onboardingInputSchema.parse({
       userId: "00000000-0000-4000-8000-000000000001",
+      authUserId: "00000000-0000-4000-8000-000000000099",
       dietaryConstraints: ["Vegan", "Gluten-free"],
       allergies: ["peanut"],
       cuisines: ["Italian", "Middle Eastern"],
@@ -34,5 +36,6 @@ describe("onboardingInputSchema", () => {
     });
     expect(parsed.cuisines).toContain("Middle Eastern");
     expect(parsed.mealTypes).toEqual(["Breakfast", "Snacks"]);
+    expect(parsed.authUserId).toBe("00000000-0000-4000-8000-000000000099");
   });
 });

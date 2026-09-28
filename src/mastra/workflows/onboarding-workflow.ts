@@ -139,17 +139,37 @@ const markCompleteStep = createStep({
   }),
   outputSchema: onboardingOutputSchema,
   execute: async ({ inputData }) => {
-    const { error } = await supabase.auth.admin.updateUserById(inputData.userId, {
-      user_metadata: { onboarding_complete: true },
+    const { data: existingUser, error: getError } = await supabase.auth.admin.getUserById(
+      inputData.authUserId,
+    );
+    if (getError) {
+      logger.error(
+        { err: getError, authUserId: inputData.authUserId },
+        "Failed to load user before marking onboarding complete",
+      );
+      throw getError;
+    }
+
+    const previousMeta =
+      existingUser.user?.user_metadata &&
+      typeof existingUser.user.user_metadata === "object"
+        ? existingUser.user.user_metadata
+        : {};
+
+    const { error } = await supabase.auth.admin.updateUserById(inputData.authUserId, {
+      user_metadata: { ...previousMeta, onboarding_complete: true },
     });
     if (error) {
       logger.error(
-        { err: error, userId: inputData.userId },
+        { err: error, authUserId: inputData.authUserId, userId: inputData.userId },
         "Failed to mark onboarding complete",
       );
       throw error;
     }
-    logger.info({ userId: inputData.userId }, "Marked onboarding complete");
+    logger.info(
+      { authUserId: inputData.authUserId, userId: inputData.userId },
+      "Marked onboarding complete",
+    );
     return {
       status: "ok" as const,
       saved: {

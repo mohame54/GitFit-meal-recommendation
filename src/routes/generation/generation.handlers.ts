@@ -3,7 +3,8 @@ import { HttpCodes } from "../../types/https-codes.js";
 import {
   MissingUserIdError,
   UserIdMismatchError,
-  resolveUserId,
+  assertOptionalUserIdMatches,
+  requireUserId,
 } from "../../middlewares/auth.js";
 import {
   generateRecipeForUser,
@@ -17,12 +18,16 @@ import {
 export const generateRecipeHandler: ApiRouterHandler<typeof GenerateRecipeRoute> = async (c) => {
   const body = c.req.valid("json");
   try {
-    const userId = resolveUserId(c.get("userId"), body.userId);
+    const userId = requireUserId(c.get("userId"));
+    assertOptionalUserIdMatches(userId, body.userId);
     const recipe = await generateRecipeForUser({ userId, prompt: body.prompt });
     return c.json(recipe, HttpCodes.CREATED);
   } catch (err) {
-    if (err instanceof MissingUserIdError || err instanceof UserIdMismatchError) {
-      return c.json({ error: err.message }, HttpCodes.BAD_REQUEST);
+    if (err instanceof UserIdMismatchError) {
+      return c.json({ error: err.message }, HttpCodes.FORBIDDEN);
+    }
+    if (err instanceof MissingUserIdError) {
+      return c.json({ error: err.message }, HttpCodes.UNAUTHORIZED);
     }
     c.var.logger.error({ err }, "Failed to generate recipe");
     return c.json(
@@ -37,12 +42,16 @@ export const listGeneratedRecipesHandler: ApiRouterHandler<
 > = async (c) => {
   const query = c.req.valid("query");
   try {
-    const userId = resolveUserId(c.get("userId"), query.userId);
+    const userId = requireUserId(c.get("userId"));
+    assertOptionalUserIdMatches(userId, query.userId);
     const recipes = await listGeneratedRecipes(userId, query.limit ?? 20);
     return c.json(recipes, HttpCodes.OK);
   } catch (err) {
-    if (err instanceof MissingUserIdError || err instanceof UserIdMismatchError) {
-      return c.json({ error: err.message }, HttpCodes.BAD_REQUEST);
+    if (err instanceof UserIdMismatchError) {
+      return c.json({ error: err.message }, HttpCodes.FORBIDDEN);
+    }
+    if (err instanceof MissingUserIdError) {
+      return c.json({ error: err.message }, HttpCodes.UNAUTHORIZED);
     }
     c.var.logger.error({ err }, "Failed to list generated recipes");
     return c.json(

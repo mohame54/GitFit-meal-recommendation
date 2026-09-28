@@ -103,8 +103,9 @@ Profile changes from chat: router restates the patch → user confirms →
 The frontend sends `{ message, sessionId? }` only. The server keeps a
 `ConversationState` with **per-agent histories**, `lastAnswer`, and
 `activeAgentId`. `MessageSummarizer` trims each history (recent window +
-compressed summary) so context stays bounded. User-bound sessions require the
-same `X-User-Id` or `userId` on follow-up requests.
+compressed summary) so context stays bounded. Sessions are bound to the
+meals profile from the Bearer token; follow-ups must use the same token
+profile.
 
 ```mermaid
 flowchart LR
@@ -132,17 +133,20 @@ flowchart LR
 | GET/POST/DELETE | `/api/constraints` | Hard constraints |
 | GET/POST/DELETE | `/api/preferences` | Soft preference weights |
 | GET | `/api/recipes` | Catalog |
-| GET | `/api/recommendations?userId=` | Ranked recommendations |
+| GET | `/api/recommendations` | Ranked recommendations |
 | POST | `/api/feedback` | Ratings / comments → preference updates |
 | GET | `/api/history/recommendations` | What was shown |
 | GET | `/api/history/feedback` | Past feedback |
 | POST/GET | `/api/generate` | AI recipe generation |
 | POST | `/api/agent/chat` | Main router with server-owned session history |
 
-Auth (optional):
+Auth:
 
-- Set `API_KEY` and send `X-Api-Key`
-- Prefer `X-User-Id` as trusted identity (must match body/query `userId` when both are sent)
+- Send `Authorization: Bearer <Supabase access token>` on browser-facing user routes
+- Identity is `user_metadata.meals_profile_id` (meals profile) and `sub` (auth user)
+- Optional: set `API_KEY` and send `X-Api-Key` (gateway only — not user auth)
+- `POST /api/profiles` stays on the service-key path (no user JWT)
+- Optional `CORS_ORIGINS` allow-list; unset echoes the request Origin
 
 ## Project layout
 
