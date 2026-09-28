@@ -1,7 +1,7 @@
 -- Seed data for local demos. Safe to re-run (uses fixed UUIDs + ON CONFLICT).
 
 -- Demo user
-insert into profiles (id, display_name, email)
+insert into user_profiles (id, display_name, email)
 values (
   '00000000-0000-0000-0000-000000000001',
   'Demo User',

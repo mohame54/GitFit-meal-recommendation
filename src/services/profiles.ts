@@ -17,7 +17,7 @@ export async function createProfile(input: {
 }): Promise<ProfileWithStatus> {
   logger.info({ displayName: input.displayName, hasEmail: Boolean(input.email) }, "Creating profile");
   const { data, error } = await supabase
-    .from("profiles")
+    .from("user_profiles")
     .insert({
       display_name: input.displayName,
       email: input.email ?? null,
@@ -38,7 +38,7 @@ export async function createProfile(input: {
 export async function getProfile(userId: string): Promise<ProfileWithStatus> {
   logger.debug({ userId }, "Getting profile");
   const { data, error } = await supabase
-    .from("profiles")
+    .from("user_profiles")
     .select("id, display_name, email, created_at, updated_at")
     .eq("id", userId)
     .maybeSingle();
@@ -76,7 +76,7 @@ export async function updateProfile(
   }
 
   const { data, error } = await supabase
-    .from("profiles")
+    .from("user_profiles")
     .update(patch)
     .eq("id", userId)
     .select("id, display_name, email, created_at, updated_at")

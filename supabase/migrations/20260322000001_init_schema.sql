@@ -6,7 +6,7 @@ create extension if not exists "pgcrypto";
 -- ---------------------------------------------------------------------------
 -- Profiles
 -- ---------------------------------------------------------------------------
-create table if not exists profiles (
+create table if not exists user_profiles (
   id uuid primary key default gen_random_uuid(),
   display_name text not null,
   email text unique,
@@ -80,7 +80,7 @@ create table if not exists recipe_categories (
 -- ---------------------------------------------------------------------------
 create table if not exists user_constraints (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references profiles(id) on delete cascade,
+  user_id uuid not null references user_profiles(id) on delete cascade,
   constraint_type text not null check (
     constraint_type in ('allergy', 'diet', 'excluded_ingredient')
   ),
@@ -94,7 +94,7 @@ create index if not exists idx_user_constraints_user
 
 create table if not exists user_preferences (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references profiles(id) on delete cascade,
+  user_id uuid not null references user_profiles(id) on delete cascade,
   preference_type text not null,
   value text not null,
   weight numeric not null default 0,
@@ -110,7 +110,7 @@ create index if not exists idx_user_preferences_user
 -- ---------------------------------------------------------------------------
 create table if not exists feedback (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references profiles(id) on delete cascade,
+  user_id uuid not null references user_profiles(id) on delete cascade,
   recipe_id uuid not null references recipes(id) on delete cascade,
   rating integer check (rating is null or (rating between 1 and 5)),
   liked boolean,
@@ -134,7 +134,7 @@ create table if not exists feedback_analysis (
 
 create table if not exists recommendations (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references profiles(id) on delete cascade,
+  user_id uuid not null references user_profiles(id) on delete cascade,
   recipe_id uuid not null references recipes(id) on delete cascade,
   context text not null default 'daily_recommendation',
   score numeric not null default 0,
@@ -149,7 +149,7 @@ create index if not exists idx_recommendations_user
 -- ---------------------------------------------------------------------------
 create table if not exists generated_recipes (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references profiles(id) on delete cascade,
+  user_id uuid not null references user_profiles(id) on delete cascade,
   title text not null,
   ingredients jsonb not null,
   steps jsonb not null,
