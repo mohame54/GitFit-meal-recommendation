@@ -10,7 +10,22 @@ export const generatedRecipeSchema = z.object({
     .array(
       z.object({
         name: z.string().min(1),
-        amount: z.string().optional(),
+        amount: z
+          .number()
+          .positive()
+          .describe("Numeric quantity only, such as 500.5 or 2. Do not include the unit."),
+        unit: z
+          .string()
+          .trim()
+          .min(1)
+          .describe('Metric or package, such as "g", "ml", "cup", "tbsp", or "egg" for 2 eggs.'),
+        aisle: z
+          .string()
+          .trim()
+          .min(1)
+          .nullable()
+          .default(null)
+          .describe('Grocery aisle, such as "Produce" or "Dairy". Null when unknown.'),
       }),
     )
     .min(1),

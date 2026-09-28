@@ -31,6 +31,15 @@ function dietFlags(tags: Array<{ value: string }>) {
   };
 }
 
+function numericColumn(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
 function stepsFromInstructions(value: unknown): string[] {
   if (Array.isArray(value)) {
     return value.filter((step): step is string => typeof step === "string" && step.length > 0);
@@ -202,7 +211,9 @@ export async function generateRecipeForUser(params: {
     payload.ingredients.map((ingredient) => ({
       recipe_id: recipe.id,
       name: ingredient.name,
-      amount: ingredient.amount ?? null,
+      amount: ingredient.amount,
+      unit: ingredient.unit,
+      aisle: ingredient.aisle ?? null,
     })),
   );
   if (ingredientError) {
@@ -288,7 +299,7 @@ export async function listGeneratedRecipes(
       ? Promise.resolve({ data: [], error: null })
       : supabase
           .from("recipe_ingredients")
-          .select("recipe_id, name, amount")
+          .select("recipe_id, name, amount, unit, aisle")
           .in("recipe_id", recipeIds),
     recipeIds.length === 0
       ? Promise.resolve({ data: [], error: null })
@@ -311,7 +322,9 @@ export async function listGeneratedRecipes(
     const list = ingredientsByRecipe.get(ingredient.recipe_id) ?? [];
     list.push({
       name: ingredient.name,
-      amount: ingredient.amount ?? undefined,
+      amount: numericColumn(ingredient.amount),
+      unit: ingredient.unit ?? null,
+      aisle: ingredient.aisle ?? null,
     });
     ingredientsByRecipe.set(ingredient.recipe_id, list);
   }

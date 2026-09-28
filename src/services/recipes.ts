@@ -4,6 +4,15 @@ import type { Recipe, RecipeAttribute } from "../types/index.js";
 
 const logger = createServiceLogger("recipes");
 
+function numericColumn(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
 export async function listRecipes(limit = 50, offset = 0): Promise<Recipe[]> {
   logger.debug({ limit, offset }, "Listing recipes");
   const { data, error } = await supabase
@@ -22,7 +31,7 @@ export async function listRecipes(limit = 50, offset = 0): Promise<Recipe[]> {
 export async function getRecipe(recipeId: string): Promise<{
   recipe: Recipe;
   attributes: RecipeAttribute[];
-  ingredients: Array<{ name: string; amount: string | null }>;
+  ingredients: Array<{ name: string; amount: number | null; unit: string | null; aisle: string | null }>;
 } | null> {
   logger.debug({ recipeId }, "Getting recipe");
   const { data: recipe, error } = await supabase
@@ -46,7 +55,7 @@ export async function getRecipe(recipeId: string): Promise<{
       .eq("recipe_id", recipeId),
     supabase
       .from("recipe_ingredients")
-      .select("name, amount")
+      .select("name, amount, unit, aisle")
       .eq("recipe_id", recipeId),
   ]);
 
@@ -70,6 +79,11 @@ export async function getRecipe(recipeId: string): Promise<{
   return {
     recipe,
     attributes: attrs.data ?? [],
-    ingredients: ingredients.data ?? [],
+    ingredients: (ingredients.data ?? []).map((ingredient) => ({
+      name: ingredient.name,
+      amount: numericColumn(ingredient.amount),
+      unit: ingredient.unit ?? null,
+      aisle: ingredient.aisle ?? null,
+    })),
   };
 }

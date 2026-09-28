@@ -72,7 +72,7 @@ export interface ExtractedFeedback {
 
 export interface GeneratedRecipePayload {
   title: string;
-  ingredients: Array<{ name: string; amount?: string }>;
+  ingredients: Array<{ name: string; amount: number | null; unit: string | null; aisle: string | null }>;
   steps: string[];
   tags: Array<{ type: string; value: string }>;
   calories?: number | null;

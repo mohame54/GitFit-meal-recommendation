@@ -121,6 +121,8 @@ export async function upsertNormalizedRecipe(
         recipe_id: recipeId,
         name: i.name,
         amount: i.amount,
+        unit: i.unit,
+        aisle: i.aisle,
       })),
     );
     if (ingError) {

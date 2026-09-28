@@ -22,7 +22,9 @@ export const RecipeDetailSchema = z
     ingredients: z.array(
       z.object({
         name: z.string(),
-        amount: z.string().nullable(),
+        amount: z.number().nullable(),
+        unit: z.string().nullable(),
+        aisle: z.string().nullable(),
       }),
     ),
   })

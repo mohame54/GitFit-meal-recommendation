@@ -15,7 +15,9 @@ const outputSchema = z.object({
   ingredients: z.array(
     z.object({
       name: z.string(),
-      amount: z.string().optional(),
+      amount: z.number().nullable(),
+      unit: z.string().nullable(),
+      aisle: z.string().nullable(),
     }),
   ),
   steps: z.array(z.string()),

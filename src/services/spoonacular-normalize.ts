@@ -16,7 +16,7 @@ export type NormalizedRecipe = {
   gluten_free: boolean;
   dairy_free: boolean;
   attributes: Array<{ attribute_type: string; attribute_value: string }>;
-  ingredients: Array<{ name: string; amount: string | null }>;
+  ingredients: Array<{ name: string; amount: number | null; unit: string | null; aisle: string | null }>;
   categoryLinks: Array<{ type: string; name: string }>;
 };
 
@@ -122,15 +122,16 @@ export function normalizeSpoonacularRecipe(raw: SpoonacularRecipe): NormalizedRe
     .filter((ing) => ing.name?.trim())
     .map((ing) => ({
       name: ing.name.trim().toLowerCase(),
-      amount:
-        ing.original?.trim() ||
-        (ing.amount != null
-          ? `${ing.amount}${ing.unit ? ` ${ing.unit}` : ""}`.trim()
-          : null),
+      amount: typeof ing.amount === "number" && Number.isFinite(ing.amount) ? ing.amount : null,
+      unit: ing.unit?.trim() || null,
+      aisle: ing.aisle?.trim() || null,
     }));
 
   // Dedupe ingredients by name (keep first amount)
-  const ingredientMap = new Map<string, { name: string; amount: string | null }>();
+  const ingredientMap = new Map<
+    string,
+    { name: string; amount: number | null; unit: string | null; aisle: string | null }
+  >();
   for (const ing of ingredients) {
     if (!ingredientMap.has(ing.name)) ingredientMap.set(ing.name, ing);
   }
