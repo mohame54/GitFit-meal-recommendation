@@ -104,9 +104,10 @@ describe("ConversationStateService", () => {
     expect(state.lastAnswerAgentId).toBe("onboarding-agent");
   });
 
-  it("buildAgentMessages includes specialist history and trusted userId", () => {
+  it("buildAgentMessages includes the display name and omits the user id", () => {
     let state = service.ensureSession({
       userId: "00000000-0000-4000-8000-000000000001",
+      displayName: "Ayman",
     });
 
     const start = service.recordDelegationStart(state, {
@@ -134,7 +135,16 @@ describe("ConversationStateService", () => {
       .map((m) => m.content)
       .join("\n");
 
-    expect(systemBlob).toContain("00000000-0000-4000-8000-000000000001");
+    expect(systemBlob).toContain("Ayman");
+    expect(systemBlob).not.toContain("00000000-0000-4000-8000-000000000001");
+
+    const routerBlob = service
+      .buildRouterMessages(state)
+      .filter((m) => m.role === "system")
+      .map((m) => m.content)
+      .join("\n");
+    expect(routerBlob).toContain("Ayman");
+    expect(routerBlob).not.toContain("00000000-0000-4000-8000-000000000001");
     expect(systemBlob).toContain("onboarding-agent");
     expect(systemBlob).toContain("Do you follow any of these diets?");
     expect(

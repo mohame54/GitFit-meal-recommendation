@@ -7,8 +7,10 @@ import { updateProfileTool } from "./update-profile-tool.js";
 /**
  * Shared tools for specialist agents (e.g. nutritionAgent).
  * To extend:
- *   1. Create src/mastra/tools/your-new-tool.ts using createTool()
- *   2. Import and add it below (or register only on a specific agent)
+ *   1. Create src/mastra/tools/your-new-tool.ts with `new BaseTool({ ... }).tool`
+ *   2. Add that export below (or register it only on a specific agent)
+ *   Server-side identity (userId and anything else on ToolActor) is injected
+ *   by BaseTool; do not add those fields to the model-facing input schema.
  *
  * Note: route-to-agent is registered only on mainRouterAgent — do not add it
  * here, or you create a circular import with the specialist agents.

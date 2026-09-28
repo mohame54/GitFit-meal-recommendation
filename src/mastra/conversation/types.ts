@@ -40,8 +40,10 @@ export interface AgentHistory {
  */
 export interface ConversationState {
   sessionId: string;
-  /** Meals profile id (JWT `sub`). */
+  /** Meals profile id (JWT `sub`). Used by tools; never sent to the model. */
   userId: string | null;
+  /** Profile display name shown to the model. */
+  displayName: string | null;
   /** Supabase Auth user id (JWT sub). Used for auth.admin updates. */
   authUserId: string | null;
   /** Specialist (or router) that should receive follow-up context next. */
@@ -65,6 +67,7 @@ export function createEmptyAgentHistory(agentId: AgentId): AgentHistory {
 export function createEmptyConversationState(params: {
   sessionId: string;
   userId?: string | null;
+  displayName?: string | null;
   authUserId?: string | null;
 }): ConversationState {
   const now = new Date().toISOString();
@@ -75,6 +78,7 @@ export function createEmptyConversationState(params: {
   return {
     sessionId: params.sessionId,
     userId: params.userId ?? null,
+    displayName: params.displayName ?? null,
     authUserId: params.authUserId ?? null,
     activeAgentId: "main-router-agent",
     lastAnswer: null,

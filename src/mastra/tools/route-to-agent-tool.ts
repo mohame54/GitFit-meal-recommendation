@@ -1,4 +1,3 @@
-import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import { parseEnv } from "../../env-parser.js";
 import { conversationStateService } from "../../services/conversation.js";
@@ -7,6 +6,7 @@ import { nutritionAgent } from "../agents/nutrition-agent.js";
 import { onboardingAgent } from "../agents/onboarding-agent.js";
 import { recipeGenerationAgent } from "../agents/recipe-generation-agent.js";
 import type { AgentId } from "../conversation/types.js";
+import { BaseTool } from "./base-tool.js";
 
 const ROUTEABLE_AGENT_IDS = [
   "onboarding-agent",
@@ -24,39 +24,44 @@ const SPECIALISTS = {
   "recipe-generation-agent": recipeGenerationAgent,
 } as const satisfies Record<RouteableAgentId, unknown>;
 
-export const routeToAgentTool = createTool({
+const inputSchema = z.object({
+  targetAgentId: z
+    .enum(ROUTEABLE_AGENT_IDS)
+    .describe(
+      "Specialist to invoke: onboarding-agent | nutrition-agent | " +
+        "feedback-extraction-agent | recipe-generation-agent",
+    ),
+  message: z
+    .string()
+    .trim()
+    .min(1)
+    .describe(
+      "Handoff prompt for the specialist (user intent and relevant conversation context). Do not include a user id.",
+    ),
+  reason: z
+    .string()
+    .trim()
+    .min(1)
+    .optional()
+    .describe("Brief reason for choosing this specialist"),
+});
+
+const outputSchema = z.object({
+  targetAgentId: z.enum(ROUTEABLE_AGENT_IDS),
+  text: z.string(),
+  reason: z.string().optional(),
+});
+
+export const routeToAgentTool = new BaseTool({
   id: "route-to-agent",
   description:
     "Route the current user request to a specialist agent and return that agent's reply. " +
     "Use this whenever onboarding, meal recommendations, feedback extraction, or recipe " +
-    "generation is needed. Pass a clear handoff message that includes any relevant context.",
-  inputSchema: z.object({
-    targetAgentId: z
-      .enum(ROUTEABLE_AGENT_IDS)
-      .describe(
-        "Specialist to invoke: onboarding-agent | nutrition-agent | " +
-          "feedback-extraction-agent | recipe-generation-agent",
-      ),
-    message: z
-      .string()
-      .trim()
-      .min(1)
-      .describe(
-        "Handoff prompt for the specialist (user intent + any needed context such as userId)",
-      ),
-    reason: z
-      .string()
-      .trim()
-      .min(1)
-      .optional()
-      .describe("Brief reason for choosing this specialist"),
-  }),
-  outputSchema: z.object({
-    targetAgentId: z.enum(ROUTEABLE_AGENT_IDS),
-    text: z.string(),
-    reason: z.string().optional(),
-  }),
-  execute: async ({ targetAgentId, message, reason }, context) => {
+    "generation is needed. Pass a clear handoff message that includes any relevant context. " +
+    "Do not include a user id; specialist tools already run as the signed-in user.",
+  inputSchema,
+  outputSchema,
+  run: async ({ targetAgentId, message, reason }, actor, context) => {
     const env = parseEnv();
     const agent = SPECIALISTS[targetAgentId];
     const modelSettings = {
@@ -64,15 +69,7 @@ export const routeToAgentTool = createTool({
       maxOutputTokens: env.LLM_MAX_TOKENS ?? 1000,
     };
 
-    const sessionIdRaw = context.requestContext.getRaw("sessionId");
-    const sessionId =
-      typeof sessionIdRaw === "string" && sessionIdRaw.trim()
-        ? sessionIdRaw.trim()
-        : null;
-
-    const session = sessionId
-      ? conversationStateService.getSession(sessionId)
-      : undefined;
+    const session = conversationStateService.getSession(actor.sessionId);
 
     let text: string;
 
@@ -105,7 +102,6 @@ export const routeToAgentTool = createTool({
         },
       );
     } else {
-      // Fallback when used outside the chat handler (no session context).
       const response = await agent.generate(message, {
         maxSteps: 5,
         modelSettings,
@@ -120,4 +116,4 @@ export const routeToAgentTool = createTool({
       ...(reason ? { reason } : {}),
     };
   },
-});
+}).tool;

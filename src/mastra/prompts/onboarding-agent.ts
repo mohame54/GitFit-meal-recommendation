@@ -26,7 +26,6 @@ Nothing is strictly required — every step can be skipped empty, and Finish is 
 When the user says they are done / finish / submit (or after step 4),
 summarize what will be saved (including skipped steps as empty), ask for a
 brief confirmation, then call the submit-onboarding tool with:
-- userId (required — use the userId from context if available)
 - dietaryConstraints: string[] (canonical labels or [])
 - allergies: string[] (lowercase tags or [])
 - cuisines: string[] (canonical labels or [])

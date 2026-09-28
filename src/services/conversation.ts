@@ -85,6 +85,7 @@ export class ConversationStateService {
   ensureSession(params: {
     sessionId?: string | null;
     userId?: string | null;
+    displayName?: string | null;
     authUserId?: string | null;
   }): ConversationState {
     const sessionId = params.sessionId?.trim() || randomUUID();
@@ -101,6 +102,7 @@ export class ConversationStateService {
     return this.store.getOrCreate({
       sessionId,
       userId: params.userId ?? null,
+      displayName: params.displayName,
       authUserId: params.authUserId ?? null,
     });
   }
@@ -226,13 +228,7 @@ export class ConversationStateService {
     const main = state.histories["main-router-agent"];
     const systemParts: string[] = [];
 
-    if (state.userId) {
-      systemParts.push(
-        `Trusted userId for this conversation: ${state.userId}. ` +
-          "Use this UUID for all tools and specialist delegations that require a userId. " +
-          "Do not ask the user for their ID unless a different user is needed.",
-      );
-    }
+    systemParts.push(userIdentityNote(state));
 
     systemParts.push(
       `Conversation sessionId: ${state.sessionId}. ` +
@@ -282,13 +278,7 @@ export class ConversationStateService {
     const history = state.histories[agentId];
     const systemParts: string[] = [];
 
-    if (state.userId) {
-      systemParts.push(
-        `Trusted userId for this conversation: ${state.userId}. ` +
-          "Use this UUID for all tools that require a userId. " +
-          "Do not ask the user for their ID unless a different user is needed.",
-      );
-    }
+    systemParts.push(userIdentityNote(state));
 
     systemParts.push(
       `Conversation sessionId: ${state.sessionId}. ` +
@@ -320,6 +310,19 @@ export class ConversationStateService {
       },
     };
   }
+}
+
+function userIdentityNote(state: ConversationState): string {
+  const name = state.displayName?.replace(/\s+/g, " ").trim();
+  if (name) {
+    return (
+      `The user's name is ${name}. ` +
+      "Tools already run as this signed-in user. Do not ask for a user id, and do not include one in tool calls or handoffs."
+    );
+  }
+  return (
+    "Tools already run as the signed-in user. Do not ask for a user id, and do not include one in tool calls or handoffs."
+  );
 }
 
 function pickTargetAgentId(value: unknown): AgentId | null {

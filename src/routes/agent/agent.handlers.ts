@@ -3,6 +3,7 @@ import type { ApiRouterHandler } from "../../lib/create-router.js";
 import { HttpCodes } from "../../types/https-codes.js";
 import { parseEnv } from "../../env-parser.js";
 import { mastra } from "../../mastra/index.js";
+import { TOOL_REQUEST_KEYS } from "../../mastra/tools/base-tool.js";
 import {
   MissingUserIdError,
   UserIdMismatchError,
@@ -15,6 +16,7 @@ import {
   conversationStateService,
   inferSpecialistFromToolCalls,
 } from "../../services/conversation.js";
+import { getProfile } from "../../services/profiles.js";
 import { ChatRoute } from "./agent.routes.js";
 import type { ChatMessage, ChatSuccessResponseBody } from "./agent.schemas.js";
 import type { ConversationState } from "../../mastra/conversation/types.js";
@@ -60,6 +62,9 @@ export const chatHandler: ApiRouterHandler<typeof ChatRoute> = async (c) => {
     return c.json({ error: "A user message is required" }, HttpCodes.BAD_REQUEST);
   }
 
+  const profile = await getProfile(userId);
+  const displayName = profile?.display_name.replace(/\s+/g, " ").trim() || null;
+
   // Backend owns history. Frontend only sends the latest turn + sessionId.
   let state: ConversationState;
   try {
@@ -67,6 +72,7 @@ export const chatHandler: ApiRouterHandler<typeof ChatRoute> = async (c) => {
       sessionId: body.sessionId,
       userId,
       authUserId,
+      displayName,
     });
   } catch (err) {
     if (
@@ -96,7 +102,9 @@ export const chatHandler: ApiRouterHandler<typeof ChatRoute> = async (c) => {
     ) as Parameters<typeof agent.generate>[0];
 
     const requestContext = new RequestContext();
-    requestContext.setRaw("sessionId", state.sessionId);
+    requestContext.setRaw(TOOL_REQUEST_KEYS.userId, userId);
+    requestContext.setRaw(TOOL_REQUEST_KEYS.authUserId, authUserId);
+    requestContext.setRaw(TOOL_REQUEST_KEYS.sessionId, state.sessionId);
 
     const response = await agent.generate(generateMessages, {
       modelSettings: {

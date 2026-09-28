@@ -1,6 +1,21 @@
-import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import { getRecommendations } from "../../services/recommendations.js";
+import { BaseTool } from "./base-tool.js";
+
+const inputSchema = z.object({
+  limit: z.number().optional().default(10).describe("How many recipes to return"),
+});
+
+const outputSchema = z.object({
+  recommendations: z.array(
+    z.object({
+      title: z.string(),
+      score: z.number(),
+      calories: z.number().nullable(),
+      readyInMinutes: z.number().nullable(),
+    }),
+  ),
+});
 
 /**
  * Wraps the existing deterministic recommendation engine as a tool.
@@ -8,29 +23,17 @@ import { getRecommendations } from "../../services/recommendations.js";
  * but the filtering/scoring logic itself stays in services/recommendations.ts —
  * unchanged, untouched by the agent, fully inspectable and testable on its own.
  */
-export const getRecommendationsTool = createTool({
+export const getRecommendationsTool = new BaseTool({
   id: "get-recommendations",
   description:
-    "Get ranked recipe recommendations for a user, already filtered by their " +
+    "Get ranked recipe recommendations for the signed-in user, already filtered by their " +
     "hard constraints (allergies, diet) and scored against their preferences. " +
     "Use this whenever the user asks what they should eat, wants suggestions, " +
     "or asks for meal ideas.",
-  inputSchema: z.object({
-    userId: z.string().describe("The user's UUID"),
-    limit: z.number().optional().default(10).describe("How many recipes to return"),
-  }),
-  outputSchema: z.object({
-    recommendations: z.array(
-      z.object({
-        title: z.string(),
-        score: z.number(),
-        calories: z.number().nullable(),
-        readyInMinutes: z.number().nullable(),
-      })
-    ),
-  }),
-  execute: async ({ userId, limit }) => {
-    const ranked = await getRecommendations(userId, limit);
+  inputSchema,
+  outputSchema,
+  run: async ({ limit }, actor) => {
+    const ranked = await getRecommendations(actor.userId, limit);
     return {
       recommendations: ranked.map((r) => ({
         title: r.recipe.title,
@@ -40,4 +43,4 @@ export const getRecommendationsTool = createTool({
       })),
     };
   },
-});
+}).tool;

@@ -17,6 +17,7 @@ export class ConversationStateStore {
   getOrCreate(params: {
     sessionId: string;
     userId?: string | null;
+    displayName?: string | null;
     authUserId?: string | null;
   }): ConversationState {
     const existing = this.sessions.get(params.sessionId);
@@ -24,6 +25,10 @@ export class ConversationStateStore {
       let touched = false;
       if (params.userId && !existing.userId) {
         existing.userId = params.userId;
+        touched = true;
+      }
+      if (params.displayName !== undefined && existing.displayName !== params.displayName) {
+        existing.displayName = params.displayName ?? null;
         touched = true;
       }
       if (params.authUserId && !existing.authUserId) {
