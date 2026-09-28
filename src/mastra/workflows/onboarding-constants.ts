@@ -47,7 +47,7 @@ export const onboardingOutputSchema = z.object({
     cuisines: z.number().int().nonnegative(),
     mealTypes: z.number().int().nonnegative(),
   }),
-  onboardingComplete: z.literal(true),
+  onboardingComplete: z.boolean().default(true),
 });
 
 export type OnboardingInput = z.infer<typeof onboardingInputSchema>;

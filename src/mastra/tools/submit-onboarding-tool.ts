@@ -32,7 +32,7 @@ const outputSchema = z.object({
     cuisines: z.number(),
     mealTypes: z.number(),
   }),
-  onboardingComplete: z.literal(true),
+  onboardingComplete: z.boolean().default(true),
 });
 
 const SubmitOnboardingDesc= `

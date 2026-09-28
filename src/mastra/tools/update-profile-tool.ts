@@ -8,7 +8,7 @@ const inputSchema = z
     displayName: z.string().trim().min(1).optional(),
     email: z.string().email().nullable().optional(),
     confirmed: z
-      .literal(true)
+      .boolean()
       .describe(
         "True only after the user explicitly confirmed these exact displayName and email values in the latest turn.",
       ),
@@ -38,7 +38,10 @@ class UpdateProfileTool extends BaseTool<typeof inputSchema, typeof outputSchema
       description:UpdateProfileDesc,
       inputSchema,
       outputSchema,
-      run: async ({ displayName, email }, actor) => {
+      run: async ({ displayName, email, confirmed }, actor) => {
+        if (!confirmed) {
+          throw new Error("Profile update requires confirmed to be true");
+        }
         const result = await updateProfile(actor.userId, { displayName, email });
         if (!result.profile) {
           throw new Error(result.status);
