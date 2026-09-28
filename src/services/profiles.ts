@@ -67,12 +67,14 @@ export async function updateProfile(
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (input.displayName !== undefined) patch.display_name = input.displayName;
   if (input.email !== undefined) patch.email = input.email;
-  // making sure the email and the user is confirmed first
   const existing = await getProfile(userId);
-  if (!existing.profile?.email) {
+  if (!existing.profile) {
+    logger.error({ userId, status: existing.status }, "Profile not available for update");
+    return profileWithStatus(existing.status);
+  }
+  if (!existing.profile.email && input.email === undefined) {
     logger.error({ userId }, "Email not found");
-    const status = "email not found";
-    return profileWithStatus(status);
+    return profileWithStatus("email not found");
   }
 
   const { data, error } = await supabase

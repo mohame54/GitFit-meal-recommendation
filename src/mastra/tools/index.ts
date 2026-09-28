@@ -15,8 +15,8 @@ import { updateProfileTool } from "./update-profile-tool.js";
  * Note: route-to-agent is registered only on mainRouterAgent — do not add it
  * here, or you create a circular import with the specialist agents.
  *
- * Specialists may still use a subset (e.g. onboardingAgent only gets
- * submitOnboardingTool; mainRouterAgent gets routeToAgentTool + updateProfileTool).
+ * Specialists may still use a subset (onboardingAgent gets submitOnboardingTool
+ * and updateProfileTool; mainRouterAgent gets routeToAgentTool + updateProfileTool).
  */
 export const tools = {
   getRecommendationsTool,

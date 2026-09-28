@@ -34,32 +34,59 @@ export async function upsertPreference(
     },
     "Upserting preference",
   );
-  const { data, error } = await supabase
+  const match = supabase
     .from("user_preferences")
-    .upsert(
-      {
-        user_id: userId,
-        preference_type: preference.preference_type,
-        value: preference.value,
-        weight,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id,preference_type,value" },
-    )
     .select("preference_type, value, weight")
-    .single();
+    .eq("user_id", userId)
+    .eq("preference_type", preference.preference_type)
+    .eq("value", preference.value)
+    .limit(1);
+  const { data: existingRows, error: fetchError } = await match;
+  if (fetchError) {
+    logger.error(
+      { err: fetchError, userId, preferenceType: preference.preference_type },
+      "Failed to fetch preference",
+    );
+    throw fetchError;
+  }
+
+  const row = {
+    user_id: userId,
+    preference_type: preference.preference_type,
+    value: preference.value,
+    weight,
+    updated_at: new Date().toISOString(),
+  };
+  const write = existingRows?.[0]
+    ? supabase
+        .from("user_preferences")
+        .update({ weight: row.weight, updated_at: row.updated_at })
+        .eq("user_id", userId)
+        .eq("preference_type", preference.preference_type)
+        .eq("value", preference.value)
+    : supabase.from("user_preferences").insert(row);
+  const { data, error } = await write.select("preference_type, value, weight").limit(1);
   if (error) {
     logger.error(
       { err: error, userId, preferenceType: preference.preference_type },
-      "Failed to upsert preference",
+      "Failed to save preference",
     );
     throw error;
   }
+  const saved = data?.[0];
+  if (!saved) {
+    const missing = new Error("Preference save returned no row");
+    logger.error(
+      { err: missing, userId, preferenceType: preference.preference_type },
+      "Failed to save preference",
+    );
+    throw missing;
+  }
   logger.info(
-    { userId, preferenceType: data.preference_type, value: data.value, weight: data.weight },
-    "Upserted preference",
+    { userId, preferenceType: saved.preference_type, value: saved.value, weight: saved.weight },
+    "Saved preference",
   );
-  return data;
+  return saved;
 }
 
 export async function deletePreference(

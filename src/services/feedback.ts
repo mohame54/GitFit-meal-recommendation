@@ -10,6 +10,7 @@ import {
   polarityFromRating,
   weightDeltaFromPolarity,
 } from "../lib/scoring.js";
+import { upsertPreference } from "./preferences.js";
 import type {
   ExtractedFeedback,
   FeedbackInput,
@@ -26,13 +27,13 @@ async function upsertPreferenceWeight(
   value: string,
   delta: number,
 ) {
-  const { data: existing, error: fetchError } = await supabase
+  const { data: existingRows, error: fetchError } = await supabase
     .from("user_preferences")
     .select("weight")
     .eq("user_id", userId)
     .eq("preference_type", preferenceType)
     .eq("value", value)
-    .maybeSingle();
+    .limit(1);
   if (fetchError) {
     logger.error(
       { err: fetchError, userId, preferenceType, value },
@@ -41,26 +42,13 @@ async function upsertPreferenceWeight(
     throw fetchError;
   }
 
-  const currentWeight = existing?.weight ?? 0;
+  const currentWeight = existingRows?.[0]?.weight ?? 0;
   const newWeight = clampWeight(currentWeight + delta);
-
-  const { error: upsertError } = await supabase.from("user_preferences").upsert(
-    {
-      user_id: userId,
-      preference_type: preferenceType,
-      value,
-      weight: newWeight,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "user_id,preference_type,value" },
-  );
-  if (upsertError) {
-    logger.error(
-      { err: upsertError, userId, preferenceType, value },
-      "Failed to upsert preference weight",
-    );
-    throw upsertError;
-  }
+  await upsertPreference(userId, {
+    preference_type: preferenceType,
+    value,
+    weight: newWeight,
+  });
   logger.debug(
     { userId, preferenceType, value, previousWeight: currentWeight, newWeight, delta },
     "Updated preference weight",

@@ -7,6 +7,11 @@ const inputSchema = z
   .object({
     displayName: z.string().trim().min(1).optional(),
     email: z.string().email().nullable().optional(),
+    confirmed: z
+      .literal(true)
+      .describe(
+        "True only after the user explicitly confirmed these exact displayName and email values in the latest turn.",
+      ),
   })
   .refine((v) => v.displayName !== undefined || v.email !== undefined, {
     message: "At least one of displayName or email is required",
@@ -33,7 +38,7 @@ class UpdateProfileTool extends BaseTool<typeof inputSchema, typeof outputSchema
       description:UpdateProfileDesc,
       inputSchema,
       outputSchema,
-      run: async ({displayName, email }, actor) => {
+      run: async ({ displayName, email }, actor) => {
         const result = await updateProfile(actor.userId, { displayName, email });
         if (!result.profile) {
           throw new Error(result.status);

@@ -36,5 +36,20 @@ Do not invent options outside the allowed lists for diet/cuisine/meal type.
 Do not call submit-onboarding until the user confirms Finish (or explicitly
 asks you to save what was collected).
 
+## Profile update (after onboarding is saved)
+
+After submit-onboarding succeeds, ask once whether the user wants to update
+their profile display name or email. This step is optional.
+
+- If they decline, skip, or say no, do not call update-profile.
+- If they want a change, collect only displayName and/or email.
+- Restate the exact values and ask them to reply yes to confirm.
+- Call update-profile with confirmed set to true only after that yes, and only
+  for the values you just restated.
+- A vague "ok" is not confirmation unless your previous message listed those
+  exact fields.
+- Do not offer this before onboarding has been saved, and do not call
+  update-profile during the four onboarding steps.
+
 Keep replies short and friendly. One question per turn.
 `;

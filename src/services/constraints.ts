@@ -27,26 +27,43 @@ export async function upsertConstraint(
     { userId, constraintType: constraint.constraint_type, value: constraint.value },
     "Upserting constraint",
   );
+  const { data: existingRows, error: fetchError } = await supabase
+    .from("user_constraints")
+    .select("id, constraint_type, value")
+    .eq("user_id", userId)
+    .eq("constraint_type", constraint.constraint_type)
+    .eq("value", constraint.value)
+    .limit(1);
+  if (fetchError) {
+    logger.error(
+      { err: fetchError, userId, constraintType: constraint.constraint_type },
+      "Failed to fetch constraint",
+    );
+    throw fetchError;
+  }
+  const existing = existingRows?.[0];
+  if (existing) {
+    logger.info({ userId, constraintId: existing.id }, "Constraint already saved");
+    return existing as UserConstraint;
+  }
+
   const { data, error } = await supabase
     .from("user_constraints")
-    .upsert(
-      {
-        user_id: userId,
-        constraint_type: constraint.constraint_type,
-        value: constraint.value,
-      },
-      { onConflict: "user_id,constraint_type,value" },
-    )
+    .insert({
+      user_id: userId,
+      constraint_type: constraint.constraint_type,
+      value: constraint.value,
+    })
     .select("id, constraint_type, value")
     .single();
   if (error) {
     logger.error(
       { err: error, userId, constraintType: constraint.constraint_type },
-      "Failed to upsert constraint",
+      "Failed to insert constraint",
     );
     throw error;
   }
-  logger.info({ userId, constraintId: data.id }, "Upserted constraint");
+  logger.info({ userId, constraintId: data.id }, "Inserted constraint");
   return data as UserConstraint;
 }
 
