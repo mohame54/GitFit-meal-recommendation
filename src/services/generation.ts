@@ -2,6 +2,7 @@ import { supabase } from "../db/client.js";
 import { parseEnv } from "../env-parser.js";
 import { createServiceLogger } from "../lib/logger.js";
 import { recipeGenerationAgent } from "../mastra/agents/recipe-generation-agent.js";
+import { LLM_MAX_RETRIES } from "../mastra/agents/utils.js";
 import type { GeneratedRecipePayload, GeneratedRecipeRecord } from "../types/index.js";
 import {
   generatedRecipeSchema,
@@ -109,6 +110,7 @@ export async function generateRecipeForUser(params: {
     modelSettings: {
       temperature: env.LLM_TEMPERATURE ?? 0.4,
       maxOutputTokens: env.LLM_MAX_TOKENS ?? 1200,
+      maxRetries: LLM_MAX_RETRIES,
     },
     structuredOutput: {
       schema: generatedRecipeSchema,

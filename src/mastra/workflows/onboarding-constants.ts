@@ -5,6 +5,12 @@ export const DIETARY_OPTIONS = [
   "Vegetarian",
   "Gluten-free",
   "Dairy-free",
+  "Halal",
+  "Kosher",
+  "Paleo",
+  "Keto",
+  "Pescetarian",
+  "High-protein",
 ] as const;
 
 export const CUISINE_OPTIONS = [
@@ -15,6 +21,14 @@ export const CUISINE_OPTIONS = [
   "American",
   "Indian",
   "Middle Eastern",
+  "African",
+  "Latin American",
+  "Caribbean",
+  "Japanese",
+  "Korean",
+  "Chinese",
+  "Thai",
+  "Vietnamese",
 ] as const;
 
 export const MEAL_TYPE_OPTIONS = [
@@ -22,6 +36,9 @@ export const MEAL_TYPE_OPTIONS = [
   "Lunch",
   "Dinner",
   "Snacks",
+  "Dessert",
+  "Drinks",
+  "Other",
 ] as const;
 
 export const dietaryConstraintSchema = z.enum(DIETARY_OPTIONS);

@@ -1,7 +1,6 @@
-import {
-  feedbackExtractionAgent,
-  feedbackExtractionSchema,
-} from "../mastra/agents/feedback-extraction-agent.js";
+import { feedbackExtractionAgent } from "../mastra/agents/feedback-extraction-agent.js";
+import { feedbackExtractionSchema } from "../mastra/agents/feedback-extraction-schema.js";
+import { LLM_MAX_RETRIES } from "../mastra/agents/utils.js";
 import { parseEnv } from "../env-parser.js";
 
 /**
@@ -16,6 +15,7 @@ export async function extractFeedbackSignal(comment: string): Promise<unknown> {
     modelSettings: {
       temperature: env.LLM_TEMPERATURE ?? 0,
       maxOutputTokens: env.LLM_MAX_TOKENS ?? 500,
+      maxRetries: LLM_MAX_RETRIES,
     },
     structuredOutput: {
       schema: feedbackExtractionSchema,
@@ -23,5 +23,6 @@ export async function extractFeedbackSignal(comment: string): Promise<unknown> {
     },
   });
 
-  return response.object;
+  const parsed = feedbackExtractionSchema.safeParse(response.object);
+  return parsed.success ? parsed.data : response.object;
 }

@@ -7,6 +7,7 @@ const inputSchema = z
   .object({
     displayName: z.string().trim().min(1).optional(),
     email: z.string().email().nullable().optional(),
+    // z.literal(true) is sent to Gemini as enum:[true] and rejected (enums must be strings).
     confirmed: z
       .boolean()
       .describe(

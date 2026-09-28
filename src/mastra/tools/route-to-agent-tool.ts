@@ -5,6 +5,7 @@ import { feedbackExtractionAgent } from "../agents/feedback-extraction-agent.js"
 import { nutritionAgent } from "../agents/nutrition-agent.js";
 import { onboardingAgent } from "../agents/onboarding-agent.js";
 import { recipeGenerationAgent } from "../agents/recipe-generation-agent.js";
+import { LLM_MAX_RETRIES } from "../agents/utils.js";
 import type { AgentId } from "../conversation/types.js";
 import { BaseTool } from "./base-tool.js";
 
@@ -72,6 +73,7 @@ class RouteToAgentTool extends BaseTool<typeof inputSchema, typeof outputSchema>
         const modelSettings = {
           temperature: env.LLM_TEMPERATURE ?? 0.0,
           maxOutputTokens: env.LLM_MAX_TOKENS ?? 1000,
+          maxRetries: LLM_MAX_RETRIES,
         };
 
         const session = conversationStateService.getSession(actor.sessionId);

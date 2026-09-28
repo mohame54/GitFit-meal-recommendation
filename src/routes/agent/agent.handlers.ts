@@ -2,6 +2,7 @@ import { RequestContext } from "@mastra/core/request-context";
 import type { ApiRouterHandler } from "../../lib/create-router.js";
 import { HttpCodes } from "../../types/https-codes.js";
 import { parseEnv } from "../../env-parser.js";
+import { LLM_MAX_RETRIES } from "../../mastra/agents/utils.js";
 import { mastra } from "../../mastra/index.js";
 import { TOOL_REQUEST_KEYS } from "../../mastra/tools/base-tool.js";
 import {
@@ -115,6 +116,7 @@ export const chatHandler: ApiRouterHandler<typeof ChatRoute> = async (c) => {
       modelSettings: {
         temperature: env.LLM_TEMPERATURE ?? 0.0,
         maxOutputTokens: env.LLM_MAX_TOKENS ?? 1000,
+        maxRetries: LLM_MAX_RETRIES,
       },
       requestContext,
     });

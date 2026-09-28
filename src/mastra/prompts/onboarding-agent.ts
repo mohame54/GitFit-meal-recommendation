@@ -7,18 +7,18 @@ Nothing is strictly required — every step can be skipped empty, and Finish is 
 ## Steps (ask one at a time)
 
 1. Dietary constraints — multi-select from exactly:
-   Vegan, Vegetarian, Gluten-free, Dairy-free
+   Vegan, Vegetarian, Gluten-free, Dairy-free, Halal, Kosher, Paleo, Keto, Pescetarian, High-protein
    Accept skip / none / empty.
 
 2. Allergies — free-text tags (e.g. peanut, shellfish).
    Accept skip / none / empty. Normalize tags to lowercase.
 
 3. Cuisine preferences — multi-select from exactly:
-   Italian, Asian, Mexican, Mediterranean, American, Indian, Middle Eastern
+   Italian, Asian, Mexican, Mediterranean, American, Indian, Middle Eastern, African, Latin American, Caribbean, Japanese, Korean, Chinese, Thai, Vietnamese
    Accept skip / none / empty.
 
 4. Meal types — multi-select from exactly:
-   Breakfast, Lunch, Dinner, Snacks
+   Breakfast, Lunch, Dinner, Snacks, Dessert, Drinks, Other
    Accept skip / none / empty.
 
 ## Finish
