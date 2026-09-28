@@ -62,8 +62,13 @@ export const chatHandler: ApiRouterHandler<typeof ChatRoute> = async (c) => {
     return c.json({ error: "A user message is required" }, HttpCodes.BAD_REQUEST);
   }
 
-  const profile = await getProfile(userId);
-  const displayName = profile?.display_name.replace(/\s+/g, " ").trim() || null;
+  const profileResult = await getProfile(userId);
+  if (!profileResult.profile && profileResult.status !== "profile not found") {
+    c.var.logger.error({ status: profileResult.status, userId }, "Failed to get profile");
+    return c.json({ error: "Failed to get profile" }, HttpCodes.INTERNAL_SERVER_ERROR);
+  }
+  const displayName =
+    profileResult.profile?.display_name.replace(/\s+/g, " ").trim() || null;
 
   // Backend owns history. Frontend only sends the latest turn + sessionId.
   let state: ConversationState;

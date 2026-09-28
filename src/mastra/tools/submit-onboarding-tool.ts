@@ -35,22 +35,32 @@ const outputSchema = z.object({
   onboardingComplete: z.literal(true),
 });
 
-export const submitOnboardingTool = new BaseTool({
-  id: "submit-onboarding",
-  description:
-    "Persist onboarding answers (dietary constraints, allergies, cuisines, meal types) " +
-    "for the signed-in user and mark onboarding_complete in user metadata. " +
-    "Empty arrays mean the step was skipped. Call only after the user confirms Finish.",
-  inputSchema,
-  outputSchema,
-  run: async (input, actor) => {
-    return runOnboardingWorkflow({
-      userId: actor.userId,
-      authUserId: actor.authUserId,
-      dietaryConstraints: input.dietaryConstraints ?? [],
-      allergies: normalizeAllergies(input.allergies ?? []),
-      cuisines: input.cuisines ?? [],
-      mealTypes: input.mealTypes ?? [],
+const SubmitOnboardingDesc= `
+Persist onboarding answers (dietary constraints, allergies, cuisines, meal types) 
+for the signed-in user and mark onboarding_complete in user metadata. 
+Empty arrays mean the step was skipped. Call only after the user confirms Finish.
+`;
+
+class SubmitOnboardingTool extends BaseTool<typeof inputSchema, typeof outputSchema> {
+  readonly id = "submit-onboarding";
+
+  constructor() {
+    super({
+      description:SubmitOnboardingDesc,
+      inputSchema,
+      outputSchema,
+      run: async (input, actor) => {
+        return runOnboardingWorkflow({
+          userId: actor.userId,
+          authUserId: actor.authUserId,
+          dietaryConstraints: input.dietaryConstraints ?? [],
+          allergies: normalizeAllergies(input.allergies ?? []),
+          cuisines: input.cuisines ?? [],
+          mealTypes: input.mealTypes ?? [],
+        });
+      },
     });
-  },
-}).tool;
+  }
+}
+
+export const submitOnboardingTool = new SubmitOnboardingTool().tool;

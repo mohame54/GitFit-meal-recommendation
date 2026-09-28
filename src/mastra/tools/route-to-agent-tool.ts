@@ -52,68 +52,77 @@ const outputSchema = z.object({
   reason: z.string().optional(),
 });
 
-export const routeToAgentTool = new BaseTool({
-  id: "route-to-agent",
-  description:
-    "Route the current user request to a specialist agent and return that agent's reply. " +
-    "Use this whenever onboarding, meal recommendations, feedback extraction, or recipe " +
-    "generation is needed. Pass a clear handoff message that includes any relevant context. " +
-    "Do not include a user id; specialist tools already run as the signed-in user.",
-  inputSchema,
-  outputSchema,
-  run: async ({ targetAgentId, message, reason }, actor, context) => {
-    const env = parseEnv();
-    const agent = SPECIALISTS[targetAgentId];
-    const modelSettings = {
-      temperature: env.LLM_TEMPERATURE ?? 0.0,
-      maxOutputTokens: env.LLM_MAX_TOKENS ?? 1000,
-    };
+const RouteToAgentDesc= `
+Route the current user request to a specialist agent and return that agent's reply. 
+Use this whenever onboarding, meal recommendations, feedback extraction, or recipe generation is needed. 
+Pass a clear handoff message that includes any relevant context. Do not include a user id; specialist tools already run as the signed-in user.
+`;
 
-    const session = conversationStateService.getSession(actor.sessionId);
+class RouteToAgentTool extends BaseTool<typeof inputSchema, typeof outputSchema> {
+  readonly id = "route-to-agent";
 
-    let text: string;
+  constructor() {
+    super({
+      description:RouteToAgentDesc,
+      inputSchema,
+      outputSchema,
+      run: async ({ targetAgentId, message, reason }, actor, context) => {
+        const env = parseEnv();
+        const agent = SPECIALISTS[targetAgentId];
+        const modelSettings = {
+          temperature: env.LLM_TEMPERATURE ?? 0.0,
+          maxOutputTokens: env.LLM_MAX_TOKENS ?? 1000,
+        };
 
-    if (session) {
-      const started = conversationStateService.recordDelegationStart(session, {
-        primitiveId: targetAgentId,
-        primitiveType: "agent",
-        prompt: message,
-      });
+        const session = conversationStateService.getSession(actor.sessionId);
 
-      const stateForGenerate = started?.state ?? session;
-      const specialistMessages = conversationStateService.buildAgentMessages(
-        stateForGenerate,
-        targetAgentId,
-      ) as Parameters<typeof agent.generate>[0];
+        let text: string;
 
-      const response = await agent.generate(specialistMessages, {
-        maxSteps: 5,
-        modelSettings,
-        requestContext: context.requestContext,
-      });
-      text = response.text || "(no text returned)";
+        if (session) {
+          const started = conversationStateService.recordDelegationStart(session, {
+            primitiveId: targetAgentId,
+            primitiveType: "agent",
+            prompt: message,
+          });
 
-      conversationStateService.recordDelegationComplete(
-        started?.state ?? stateForGenerate,
-        {
-          primitiveId: targetAgentId,
-          primitiveType: "agent",
+          const stateForGenerate = started?.state ?? session;
+          const specialistMessages = conversationStateService.buildAgentMessages(
+            stateForGenerate,
+            targetAgentId,
+          ) as Parameters<typeof agent.generate>[0];
+
+          const response = await agent.generate(specialistMessages, {
+            maxSteps: 5,
+            modelSettings,
+            requestContext: context.requestContext,
+          });
+          text = response.text || "(no text returned)";
+
+          conversationStateService.recordDelegationComplete(
+            started?.state ?? stateForGenerate,
+            {
+              primitiveId: targetAgentId,
+              primitiveType: "agent",
+              text,
+            },
+          );
+        } else {
+          const response = await agent.generate(message, {
+            maxSteps: 5,
+            modelSettings,
+            requestContext: context.requestContext,
+          });
+          text = response.text || "(no text returned)";
+        }
+
+        return {
+          targetAgentId: targetAgentId as AgentId & RouteableAgentId,
           text,
-        },
-      );
-    } else {
-      const response = await agent.generate(message, {
-        maxSteps: 5,
-        modelSettings,
-        requestContext: context.requestContext,
-      });
-      text = response.text || "(no text returned)";
-    }
+          ...(reason ? { reason } : {}),
+        };
+      },
+    });
+  }
+}
 
-    return {
-      targetAgentId: targetAgentId as AgentId & RouteableAgentId,
-      text,
-      ...(reason ? { reason } : {}),
-    };
-  },
-}).tool;
+export const routeToAgentTool = new RouteToAgentTool().tool;

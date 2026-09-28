@@ -27,7 +27,6 @@ export type ToolRunContext = {
 };
 
 type ToolDefinition<TInputSchema extends ZodTypeAny, TOutputSchema extends ZodTypeAny> = {
-  id: string;
   description: string;
   inputSchema: TInputSchema;
   outputSchema: TOutputSchema;
@@ -48,24 +47,34 @@ function readRequiredString(requestContext: RequestContext, key: string): string
 
 /**
  * Mastra tool whose `run` receives the signed-in user from request context.
+ * Subclasses set {@link BaseTool.id}; that id is what `createTool` receives.
  * `inputSchema` is only what the model fills in.
  *
  * To give every tool another server-side value, add it to {@link ToolActor}
- * and {@link BaseTool.resolveActor}. Extend this class and override
- * `resolveActor` only when one tool needs something the others should not see.
+ * and {@link BaseTool.resolveActor}. Override `resolveActor` only when one
+ * tool needs something the others should not see.
  */
-export class BaseTool<TInputSchema extends ZodTypeAny, TOutputSchema extends ZodTypeAny> {
+export abstract class BaseTool<
+  TInputSchema extends ZodTypeAny,
+  TOutputSchema extends ZodTypeAny,
+> {
+  abstract readonly id: string;
+
   constructor(
     private readonly definition: ToolDefinition<TInputSchema, TOutputSchema>,
   ) {}
 
   private cachedTool?: Tool<ZodOutput<TInputSchema>, ZodOutput<TOutputSchema>>;
 
-  /** Tool instance registered on an agent. */
+  /** Tool instance registered on an agent. Built after the subclass `id` exists. */
   get tool(): Tool<ZodOutput<TInputSchema>, ZodOutput<TOutputSchema>> {
     if (!this.cachedTool) {
+      const id = this.id.trim();
+      if (!id) {
+        throw new Error("Tool id is required");
+      }
       this.cachedTool = createTool({
-        id: this.definition.id,
+        id,
         description: this.definition.description,
         inputSchema: this.definition.inputSchema,
         outputSchema: this.definition.outputSchema,

@@ -23,22 +23,32 @@ const outputSchema = z.object({
   readyInMinutes: z.number().nullable().optional(),
 });
 
-export const generateRecipeTool = new BaseTool({
-  id: "generate-recipe",
-  description:
-    "Generate a new personalized recipe for the signed-in user using their constraints and preferences. " +
-    "Use this when the user asks to invent/create a custom recipe, or when catalog recommendations are not enough.",
-  inputSchema,
-  outputSchema,
-  run: async ({ prompt }, actor) => {
-    const recipe = await generateRecipeForUser({ userId: actor.userId, prompt });
-    return {
-      id: recipe.id,
-      title: recipe.title,
-      ingredients: recipe.ingredients,
-      steps: recipe.steps,
-      calories: recipe.calories ?? null,
-      readyInMinutes: recipe.ready_in_minutes ?? null,
-    };
-  },
-}).tool;
+const GenerateRecipeDesc= `
+Generate a new personalized recipe for the signed-in user using their constraints and preferences. 
+Use this when the user asks to invent/create a custom recipe, or when catalog recommendations are not enough.
+`;
+
+class GenerateRecipeTool extends BaseTool<typeof inputSchema, typeof outputSchema> {
+  readonly id = "generate-recipe";
+
+  constructor() {
+    super({
+      description: GenerateRecipeDesc,
+      inputSchema,
+      outputSchema,
+      run: async ({ prompt }, actor) => {
+        const recipe = await generateRecipeForUser({ userId: actor.userId, prompt });
+        return {
+          id: recipe.id,
+          title: recipe.title,
+          ingredients: recipe.ingredients,
+          steps: recipe.steps,
+          calories: recipe.calories ?? null,
+          readyInMinutes: recipe.ready_in_minutes ?? null,
+        };
+      },
+    });
+  }
+}
+
+export const generateRecipeTool = new GenerateRecipeTool().tool;

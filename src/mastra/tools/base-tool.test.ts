@@ -20,16 +20,23 @@ function actorContext(): RequestContext {
   return requestContext;
 }
 
+class EchoTool extends BaseTool<typeof inputSchema, typeof outputSchema> {
+  readonly id = "echo-user";
+
+  constructor() {
+    super({
+      description: "Echo the note and the signed-in user.",
+      inputSchema,
+      outputSchema,
+      run: async (input, actor) => {
+        return { note: input.note, userId: actor.userId };
+      },
+    });
+  }
+}
+
 describe("BaseTool", () => {
-  const echoTool = new BaseTool({
-    id: "echo-user",
-    description: "Echo the note and the signed-in user.",
-    inputSchema,
-    outputSchema,
-    run: async (input, actor) => {
-      return { note: input.note, userId: actor.userId };
-    },
-  }).tool;
+  const echoTool = new EchoTool().tool;
 
   it("injects the signed-in user instead of a model-supplied id", async () => {
     const result = await echoTool.execute?.(
@@ -37,6 +44,7 @@ describe("BaseTool", () => {
       { requestContext: actorContext() } as never,
     );
 
+    expect(echoTool.id).toBe("echo-user");
     expect(result).toEqual({
       note: "hello",
       userId: "00000000-0000-4000-8000-000000000001",

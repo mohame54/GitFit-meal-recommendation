@@ -5,11 +5,6 @@ import { BaseTool } from "./base-tool.js";
 
 const inputSchema = z
   .object({
-    // Boolean, not z.literal(true): Gemini enum values must be strings,
-    // and a boolean literal is sent as enum: [true].
-    confirmed: z
-      .boolean()
-      .describe("Must be true; only set after explicit user confirmation"),
     displayName: z.string().trim().min(1).optional(),
     email: z.string().email().nullable().optional(),
   })
@@ -18,33 +13,45 @@ const inputSchema = z
   });
 
 const outputSchema = z.object({
-  display_name: z.string(),
-  email: z.string().nullable(),
+  status: z.string(),
+  display_name: z.string().optional(),
+  email: z.string().nullable().optional(),
 });
 
-export const updateProfileTool = new BaseTool({
-  id: "update-profile",
-  description:
-    "Update the signed-in user's profile (display name and/or email). " +
-    "MUST only be called after the user explicitly confirms the exact proposed changes " +
-    "in the latest conversation turn. Set confirmed to true only when that confirmation " +
-    "is present. Do not invent fields beyond displayName and email.",
-  inputSchema,
-  outputSchema,
-  run: async ({ confirmed, displayName, email }, actor) => {
-    if (confirmed !== true) {
-      throw new Error("Profile update requires confirmed: true");
-    }
-    const profile = await updateProfile(actor.userId, { displayName, email });
-    conversationStateService.ensureSession({
-      sessionId: actor.sessionId,
-      userId: actor.userId,
-      authUserId: actor.authUserId,
-      displayName: profile.display_name,
+const UpdateProfileDesc= `
+Update the signed-in user's profile (display name and/or email). 
+MUST only be called after the user explicitly confirms the exact proposed changes 
+in the latest conversation turn. Set confirmed to true only when that confirmation 
+is present. Do not invent fields beyond displayName and email.
+`;
+
+class UpdateProfileTool extends BaseTool<typeof inputSchema, typeof outputSchema> {
+  readonly id = "update-profile";
+
+  constructor() {
+    super({
+      description:UpdateProfileDesc,
+      inputSchema,
+      outputSchema,
+      run: async ({displayName, email }, actor) => {
+        const result = await updateProfile(actor.userId, { displayName, email });
+        if (!result.profile) {
+          throw new Error(result.status);
+        }
+        conversationStateService.ensureSession({
+          sessionId: actor.sessionId,
+          userId: actor.userId,
+          authUserId: actor.authUserId,
+          displayName: result.profile.display_name,
+        });
+        return {
+          status: result.status,
+          display_name: result.profile.display_name,
+          email: result.profile.email,
+        };
+      },
     });
-    return {
-      display_name: profile.display_name,
-      email: profile.email,
-    };
-  },
-}).tool;
+  }
+}
+
+export const updateProfileTool = new UpdateProfileTool().tool;

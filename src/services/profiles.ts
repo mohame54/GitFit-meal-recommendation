@@ -1,13 +1,20 @@
 import { supabase } from "../db/client.js";
 import { createServiceLogger } from "../lib/logger.js";
-import type { Profile } from "../types/index.js";
+import type { Profile, ProfileWithStatus } from "../types/index.js";
 
 const logger = createServiceLogger("profiles");
+
+function profileWithStatus(status: string, profile?: Profile): ProfileWithStatus {
+  if (!profile) {
+    return { status };
+  }
+  return { profile, status };
+}
 
 export async function createProfile(input: {
   displayName: string;
   email?: string;
-}): Promise<Profile> {
+}): Promise<ProfileWithStatus> {
   logger.info({ displayName: input.displayName, hasEmail: Boolean(input.email) }, "Creating profile");
   const { data, error } = await supabase
     .from("profiles")
@@ -19,13 +26,16 @@ export async function createProfile(input: {
     .single();
   if (error) {
     logger.error({ err: error }, "Failed to create profile");
-    throw error;
+    const status = "failed to create profile " + JSON.stringify(error);
+    return profileWithStatus(status);
   }
-  logger.info({ userId: data.id }, "Created profile");
-  return data;
+  const status = "created profile";
+  logger.info({ userId: data.id }, status);
+
+  return profileWithStatus(status, data);
 }
 
-export async function getProfile(userId: string): Promise<Profile | null> {
+export async function getProfile(userId: string): Promise<ProfileWithStatus> {
   logger.debug({ userId }, "Getting profile");
   const { data, error } = await supabase
     .from("profiles")
@@ -34,19 +44,22 @@ export async function getProfile(userId: string): Promise<Profile | null> {
     .maybeSingle();
   if (error) {
     logger.error({ err: error, userId }, "Failed to get profile");
-    throw error;
+    const status = "failed to get profile " + JSON.stringify(error);
+    return profileWithStatus(status);
   }
   if (!data) {
     logger.debug({ userId }, "Profile not found");
-    return null;
+    const status = "profile not found";
+    return profileWithStatus(status);
   }
-  return data;
+  const status = "profile found";
+  return profileWithStatus(status, data);
 }
 
 export async function updateProfile(
   userId: string,
   input: { displayName?: string; email?: string | null },
-): Promise<Profile> {
+): Promise<ProfileWithStatus> {
   logger.info(
     { userId, hasDisplayName: input.displayName !== undefined, hasEmail: input.email !== undefined },
     "Updating profile",
@@ -54,6 +67,13 @@ export async function updateProfile(
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (input.displayName !== undefined) patch.display_name = input.displayName;
   if (input.email !== undefined) patch.email = input.email;
+  // making sure the email and the user is confirmed first
+  const existing = await getProfile(userId);
+  if (!existing.profile?.email) {
+    logger.error({ userId }, "Email not found");
+    const status = "email not found";
+    return profileWithStatus(status);
+  }
 
   const { data, error } = await supabase
     .from("profiles")
@@ -63,8 +83,10 @@ export async function updateProfile(
     .single();
   if (error) {
     logger.error({ err: error, userId }, "Failed to update profile");
-    throw error;
+    const status = "failed to update profile " + JSON.stringify(error);
+    return profileWithStatus(status);
   }
   logger.info({ userId }, "Updated profile");
-  return data;
+  const status = "updated profile";
+  return profileWithStatus(status, data);
 }

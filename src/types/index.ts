@@ -41,6 +41,11 @@ export interface Profile {
   updated_at?: string;
 }
 
+export interface ProfileWithStatus{
+    profile?: Profile;
+    status: string
+  };
+
 export interface ScoredRecipe {
   recipe: Recipe;
   score: number;
