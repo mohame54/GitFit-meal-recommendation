@@ -115,7 +115,7 @@ export async function generateRecipeForUser(params: {
 
   const payload: GeneratedRecipePayload = value;
   const { data, error } = await supabase
-    .from("generated_recipes")
+    .from("generated_content")
     .insert({
       user_id: params.userId,
       title: payload.title,
@@ -165,7 +165,7 @@ export async function listGeneratedRecipes(
 ): Promise<GeneratedRecipeRecord[]> {
   logger.debug({ userId, limit }, "Listing generated recipes");
   const { data, error } = await supabase
-    .from("generated_recipes")
+    .from("generated_content")
     .select(
       "id, user_id, title, ingredients, steps, tags, calories, ready_in_minutes, servings, is_valid, created_at",
     )

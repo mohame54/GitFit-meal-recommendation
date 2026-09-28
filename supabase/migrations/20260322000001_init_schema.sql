@@ -147,7 +147,7 @@ create index if not exists idx_recommendations_user
 -- ---------------------------------------------------------------------------
 -- AI-generated recipes (validated schema stored as JSON)
 -- ---------------------------------------------------------------------------
-create table if not exists generated_recipes (
+create table if not exists generated_content (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references user_profiles(id) on delete cascade,
   title text not null,
@@ -162,8 +162,8 @@ create table if not exists generated_recipes (
   created_at timestamptz not null default now()
 );
 
-create index if not exists idx_generated_recipes_user
-  on generated_recipes (user_id, created_at desc);
+create index if not exists idx_generated_content_user
+  on generated_content (user_id, created_at desc);
 
 -- ---------------------------------------------------------------------------
 -- Hard-constraint filter (deterministic SQL — no LLM)
