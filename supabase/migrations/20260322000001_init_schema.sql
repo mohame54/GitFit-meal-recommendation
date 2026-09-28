@@ -33,6 +33,7 @@ create table if not exists recipes (
   vegetarian boolean not null default false,
   gluten_free boolean not null default false,
   dairy_free boolean not null default false,
+  instructions text,
   created_at timestamptz not null default now(),
   unique (source_api, external_id)
 );
@@ -145,20 +146,17 @@ create index if not exists idx_recommendations_user
   on recommendations (user_id, shown_at desc);
 
 -- ---------------------------------------------------------------------------
--- AI-generated recipes (validated schema stored as JSON)
+-- Model log for a generation. The recipe itself is stored in recipes,
+-- and the user link is a recommendations row with context generated_recipe.
 -- ---------------------------------------------------------------------------
 create table if not exists generated_content (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references user_profiles(id) on delete cascade,
-  title text not null,
-  ingredients jsonb not null,
-  steps jsonb not null,
-  tags jsonb not null default '[]'::jsonb,
-  calories numeric,
-  ready_in_minutes integer,
-  servings integer,
-  raw_payload jsonb not null,
-  is_valid boolean not null default true,
+  content_type text not null,
+  prompt_context text,
+  raw_output jsonb,
+  schema_version integer,
+  is_valid boolean not null default false,
   created_at timestamptz not null default now()
 );
 

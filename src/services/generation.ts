@@ -14,6 +14,41 @@ export { generatedRecipeSchema, validateGeneratedRecipe };
 
 const logger = createServiceLogger("generation");
 
+const GENERATED_SOURCE = "generated";
+const GENERATED_CONTEXT = "generated_recipe";
+const GENERATED_CONTENT_TYPE = "recipe";
+const GENERATED_SCHEMA_VERSION = 1;
+
+function dietFlags(tags: Array<{ value: string }>) {
+  const values = new Set(tags.map((tag) => tag.value.toLowerCase()));
+  const vegan = values.has("vegan");
+  return {
+    vegan,
+    vegetarian: vegan || values.has("vegetarian"),
+    gluten_free: values.has("gluten_free") || values.has("gluten-free"),
+    dairy_free: values.has("dairy_free") || values.has("dairy-free"),
+  };
+}
+
+function stepsFromInstructions(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((step): step is string => typeof step === "string" && step.length > 0);
+  }
+  if (typeof value !== "string" || !value.trim()) return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((step): step is string => typeof step === "string" && step.length > 0);
+    }
+  } catch {
+    // Plain text instructions, one step per line.
+  }
+  return value
+    .split("\n")
+    .map((step) => step.trim())
+    .filter(Boolean);
+}
+
 function buildPrompt(params: {
   userId: string;
   prompt?: string;
@@ -70,7 +105,7 @@ export async function generateRecipeForUser(params: {
   });
 
   const response = await recipeGenerationAgent.generate(prompt, {
-    maxSteps: 1,
+    maxSteps: env.LLM_MAX_STEPS ?? 1,
     modelSettings: {
       temperature: env.LLM_TEMPERATURE ?? 0.4,
       maxOutputTokens: env.LLM_MAX_TOKENS ?? 1200,
@@ -114,48 +149,109 @@ export async function generateRecipeForUser(params: {
   }
 
   const payload: GeneratedRecipePayload = value;
-  const { data, error } = await supabase
+  const { data: generated, error: generatedError } = await supabase
     .from("generated_content")
     .insert({
       user_id: params.userId,
-      title: payload.title,
-      ingredients: payload.ingredients,
-      steps: payload.steps,
-      tags: payload.tags,
-      calories: payload.calories ?? null,
-      ready_in_minutes: payload.ready_in_minutes ?? null,
-      servings: payload.servings ?? null,
-      raw_payload: payload,
+      content_type: GENERATED_CONTENT_TYPE,
+      prompt_context: prompt,
+      raw_output: payload,
+      schema_version: GENERATED_SCHEMA_VERSION,
       is_valid: true,
     })
-    .select(
-      "id, user_id, title, ingredients, steps, tags, calories, ready_in_minutes, servings, is_valid, created_at",
-    )
+    .select("id, created_at")
     .single();
-  if (error) {
+  if (generatedError) {
     logger.error(
-      { err: error, userId: params.userId, title: payload.title },
+      { err: generatedError, userId: params.userId, title: payload.title },
+      "Failed to persist generated content",
+    );
+    throw generatedError;
+  }
+
+  const flags = dietFlags(payload.tags);
+  const { data: recipe, error: recipeError } = await supabase
+    .from("recipes")
+    .insert({
+      external_id: generated.id,
+      source_api: GENERATED_SOURCE,
+      title: payload.title,
+      image_url: null,
+      ready_in_minutes: payload.ready_in_minutes ?? null,
+      servings: payload.servings ?? null,
+      calories: payload.calories ?? null,
+      protein_g: null,
+      carbs_g: null,
+      fat_g: null,
+      ...flags,
+      instructions: payload.steps.join("\n"),
+    })
+    .select("id")
+    .single();
+  if (recipeError) {
+    logger.error(
+      { err: recipeError, userId: params.userId, title: payload.title },
       "Failed to persist generated recipe",
     );
-    throw error;
+    throw recipeError;
+  }
+
+  const { error: ingredientError } = await supabase.from("recipe_ingredients").insert(
+    payload.ingredients.map((ingredient) => ({
+      recipe_id: recipe.id,
+      name: ingredient.name,
+      amount: ingredient.amount ?? null,
+    })),
+  );
+  if (ingredientError) {
+    logger.error({ err: ingredientError, recipeId: recipe.id }, "Failed to persist generated ingredients");
+    throw ingredientError;
+  }
+
+  if (payload.tags.length > 0) {
+    const { error: attributeError } = await supabase.from("recipe_attributes").insert(
+      payload.tags.map((tag) => ({
+        recipe_id: recipe.id,
+        attribute_type: tag.type,
+        attribute_value: tag.value,
+      })),
+    );
+    if (attributeError) {
+      logger.error({ err: attributeError, recipeId: recipe.id }, "Failed to persist generated attributes");
+      throw attributeError;
+    }
+  }
+
+  const { error: recommendationError } = await supabase.from("recommendations").insert({
+    user_id: params.userId,
+    recipe_id: recipe.id,
+    context: GENERATED_CONTEXT,
+    score: 0,
+  });
+  if (recommendationError) {
+    logger.error(
+      { err: recommendationError, userId: params.userId, recipeId: recipe.id },
+      "Failed to persist generated recommendation",
+    );
+    throw recommendationError;
   }
 
   logger.info(
-    { userId: params.userId, recipeId: data.id, title: data.title },
+    { userId: params.userId, recipeId: recipe.id, title: payload.title },
     "Generated recipe",
   );
   return {
-    id: data.id,
-    user_id: data.user_id,
-    title: data.title,
-    ingredients: data.ingredients,
-    steps: data.steps,
-    tags: data.tags,
-    calories: data.calories,
-    ready_in_minutes: data.ready_in_minutes,
-    servings: data.servings,
-    is_valid: data.is_valid,
-    created_at: data.created_at,
+    id: recipe.id,
+    user_id: params.userId,
+    title: payload.title,
+    ingredients: payload.ingredients,
+    steps: payload.steps,
+    tags: payload.tags,
+    calories: payload.calories ?? null,
+    ready_in_minutes: payload.ready_in_minutes ?? null,
+    servings: payload.servings ?? null,
+    is_valid: true,
+    created_at: generated.created_at,
   };
 }
 
@@ -165,17 +261,82 @@ export async function listGeneratedRecipes(
 ): Promise<GeneratedRecipeRecord[]> {
   logger.debug({ userId, limit }, "Listing generated recipes");
   const { data, error } = await supabase
-    .from("generated_content")
+    .from("recommendations")
     .select(
-      "id, user_id, title, ingredients, steps, tags, calories, ready_in_minutes, servings, is_valid, created_at",
+      "shown_at, recipe:recipes(id, title, calories, ready_in_minutes, servings, instructions)",
     )
     .eq("user_id", userId)
-    .order("created_at", { ascending: false })
+    .eq("context", GENERATED_CONTEXT)
+    .order("shown_at", { ascending: false })
     .limit(limit);
   if (error) {
     logger.error({ err: error, userId, limit }, "Failed to list generated recipes");
     throw error;
   }
-  logger.debug({ userId, count: data?.length ?? 0 }, "Listed generated recipes");
-  return (data ?? []) as GeneratedRecipeRecord[];
+
+  const rows = (data ?? []).flatMap((row) => {
+    const recipe = Array.isArray(row.recipe) ? row.recipe[0] : row.recipe;
+    if (!recipe) return [];
+    return [{ shownAt: row.shown_at as string, recipe }];
+  });
+  const recipeIds = rows.map((row) => row.recipe.id as string);
+
+  const [ingredientsResult, attributesResult] = await Promise.all([
+    recipeIds.length === 0
+      ? Promise.resolve({ data: [], error: null })
+      : supabase
+          .from("recipe_ingredients")
+          .select("recipe_id, name, amount")
+          .in("recipe_id", recipeIds),
+    recipeIds.length === 0
+      ? Promise.resolve({ data: [], error: null })
+      : supabase
+          .from("recipe_attributes")
+          .select("recipe_id, attribute_type, attribute_value")
+          .in("recipe_id", recipeIds),
+  ]);
+  if (ingredientsResult.error) {
+    logger.error({ err: ingredientsResult.error, userId }, "Failed to list generated ingredients");
+    throw ingredientsResult.error;
+  }
+  if (attributesResult.error) {
+    logger.error({ err: attributesResult.error, userId }, "Failed to list generated attributes");
+    throw attributesResult.error;
+  }
+
+  const ingredientsByRecipe = new Map<string, GeneratedRecipeRecord["ingredients"]>();
+  for (const ingredient of ingredientsResult.data ?? []) {
+    const list = ingredientsByRecipe.get(ingredient.recipe_id) ?? [];
+    list.push({
+      name: ingredient.name,
+      amount: ingredient.amount ?? undefined,
+    });
+    ingredientsByRecipe.set(ingredient.recipe_id, list);
+  }
+  const tagsByRecipe = new Map<string, GeneratedRecipeRecord["tags"]>();
+  for (const attribute of attributesResult.data ?? []) {
+    const list = tagsByRecipe.get(attribute.recipe_id) ?? [];
+    list.push({ type: attribute.attribute_type, value: attribute.attribute_value });
+    tagsByRecipe.set(attribute.recipe_id, list);
+  }
+
+  const recipes = rows.map((row) => {
+    const recipe = row.recipe;
+    const recipeId = recipe.id as string;
+    return {
+      id: recipeId,
+      user_id: userId,
+      title: recipe.title as string,
+      ingredients: ingredientsByRecipe.get(recipeId) ?? [],
+      steps: stepsFromInstructions(recipe.instructions),
+      tags: tagsByRecipe.get(recipeId) ?? [],
+      calories: (recipe.calories as number | null) ?? null,
+      ready_in_minutes: (recipe.ready_in_minutes as number | null) ?? null,
+      servings: (recipe.servings as number | null) ?? null,
+      is_valid: true,
+      created_at: row.shownAt,
+    };
+  });
+  logger.debug({ userId, count: recipes.length }, "Listed generated recipes");
+  return recipes;
 }

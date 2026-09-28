@@ -38,6 +38,7 @@ const envSchema = z.object({
   LLM_MAX_TOKENS: z.coerce.number().optional(),
   SUPABASE_URL: z.string().min(1),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+  LLM_MAX_STEPS: z.coerce.number().optional().default(3),
   /**
    * Comma-separated JWT `alg` values this API accepts (e.g. ES256 for ECC P-256).
    * Defaults to ES256. Token headers must match one of these before verification.
