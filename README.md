@@ -143,7 +143,7 @@ flowchart LR
 Auth:
 
 - Send `Authorization: Bearer <Supabase access token>` on browser-facing user routes
-- Identity is `user_metadata.meals_profile_id` (meals profile) and `sub` (auth user)
+- Identity is the JWT `sub` claim (Supabase user id and meals profile id)
 - Optional: set `API_KEY` and send `X-Api-Key` (gateway only — not user auth)
 - `POST /api/profiles` stays on the service-key path (no user JWT)
 - Optional `CORS_ORIGINS` allow-list; unset echoes the request Origin

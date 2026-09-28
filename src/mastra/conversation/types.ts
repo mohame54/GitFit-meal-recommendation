@@ -40,7 +40,7 @@ export interface AgentHistory {
  */
 export interface ConversationState {
   sessionId: string;
-  /** Meals profile id (JWT meals_profile_id). */
+  /** Meals profile id (JWT `sub`). */
   userId: string | null;
   /** Supabase Auth user id (JWT sub). Used for auth.admin updates. */
   authUserId: string | null;

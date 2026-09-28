@@ -4,7 +4,7 @@ import { HttpCodes } from "../types/https-codes.js";
 
 export type AppEnv = {
   Variables: Env["Variables"] & {
-    /** Meals profile id from JWT `user_metadata.meals_profile_id`. */
+    /** Meals profile id from JWT `sub`. */
     userId?: string;
     /** Supabase Auth user id from JWT `sub`. */
     authUserId?: string;

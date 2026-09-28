@@ -58,8 +58,7 @@ export const apiKeyAuth: MiddlewareHandler<AppEnv> = createMiddleware(async (c, 
 
 /**
  * Verify Supabase access token and set trusted identity on the context.
- * `userId` is the meals profile id (`user_metadata.meals_profile_id`).
- * `authUserId` is the Supabase Auth user id (`sub`).
+ * The meals profile id and the auth user id are both the JWT `sub` claim.
  */
 export const supabaseJwtAuth: MiddlewareHandler<AppEnv> = createMiddleware(async (c, next) => {
   if (!requiresJwt(c.req.method, c.req.path)) {
@@ -92,7 +91,7 @@ export const supabaseJwtAuth: MiddlewareHandler<AppEnv> = createMiddleware(async
     return c.json({ error: message }, HttpCodes.UNAUTHORIZED);
   }
 
-  // Path profile id must match the token's meals profile.
+  // Path profile id must match the token subject.
   const profilePathMatch = c.req.path.match(/^\/api\/profiles\/([^/]+)$/);
   if (profilePathMatch && (c.req.method === "GET" || c.req.method === "PATCH")) {
     const pathProfileId = decodeURIComponent(profilePathMatch[1] ?? "").trim();

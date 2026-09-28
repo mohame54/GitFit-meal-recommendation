@@ -2,9 +2,9 @@ import { createRemoteJWKSet, decodeProtectedHeader, jwtVerify, type JWTPayload }
 import { parseEnv } from "../env-parser.js";
 
 export type VerifiedMealsToken = {
-  /** Supabase Auth user id (`sub`). */
+  /** Supabase Auth user id (`sub`). Also the meals profile id. */
   authUserId: string;
-  /** Meals profile id from `user_metadata.meals_profile_id`. */
+  /** Meals profile id. Same value as `sub`. */
   mealsProfileId: string;
 };
 
@@ -14,10 +14,6 @@ export class JwtVerificationError extends Error {
     this.name = "JwtVerificationError";
   }
 }
-
-type UserMetadata = {
-  meals_profile_id?: unknown;
-};
 
 /** HMAC algorithms verified with SUPABASE_JWT_SECRET. */
 const HMAC_ALGS = new Set(["HS256", "HS384", "HS512"]);
@@ -37,15 +33,6 @@ const ASYMMETRIC_ALGS = new Set([
 
 function issuerFromSupabaseUrl(supabaseUrl: string): string {
   return `${supabaseUrl.replace(/\/+$/, "")}/auth/v1`;
-}
-
-function readMealsProfileId(payload: JWTPayload): string {
-  const meta = payload.user_metadata as UserMetadata | undefined;
-  const id = meta?.meals_profile_id;
-  if (typeof id !== "string" || !id.trim()) {
-    throw new JwtVerificationError("Missing meals_profile_id in token");
-  }
-  return id.trim();
 }
 
 let jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
@@ -121,6 +108,6 @@ export async function verifySupabaseAccessToken(token: string): Promise<Verified
 
   return {
     authUserId,
-    mealsProfileId: readMealsProfileId(payload),
+    mealsProfileId: authUserId,
   };
 }

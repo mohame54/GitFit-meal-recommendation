@@ -9,7 +9,6 @@ import { supabaseJwtAuth } from "./auth.js";
 const JWT_SECRET = "test-supabase-jwt-secret-at-least-32-chars";
 const SUPABASE_URL = "https://example.supabase.co";
 const AUTH_USER_ID = "11111111-1111-4111-8111-111111111111";
-const MEALS_PROFILE_ID = "22222222-2222-4222-8222-222222222222";
 
 function seedEnv(): void {
   process.env.PORT = "3000";
@@ -31,27 +30,24 @@ function seedEnv(): void {
 }
 
 async function signAccessToken(claims: {
-  sub?: string;
-  mealsProfileId?: string | null;
+  sub?: string | null;
   expOffsetSec?: number;
-}): Promise<string> {
+  userMetadata?: Record<string, unknown>;
+} = {}): Promise<string> {
   const secret = new TextEncoder().encode(JWT_SECRET);
   const now = Math.floor(Date.now() / 1000);
   const builder = new SignJWT({
-    ...(claims.mealsProfileId === null
-      ? { user_metadata: {} }
-      : {
-          user_metadata: {
-            meals_profile_id: claims.mealsProfileId ?? MEALS_PROFILE_ID,
-          },
-        }),
+    ...(claims.userMetadata ? { user_metadata: claims.userMetadata } : {}),
   })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuer(`${SUPABASE_URL}/auth/v1`)
     .setAudience("authenticated")
-    .setSubject(claims.sub ?? AUTH_USER_ID)
     .setIssuedAt(now - 60)
     .setExpirationTime(now + (claims.expOffsetSec ?? 3600));
+
+  if (claims.sub !== null) {
+    builder.setSubject(claims.sub ?? AUTH_USER_ID);
+  }
 
   return builder.sign(secret);
 }
@@ -75,7 +71,7 @@ describe("supabaseJwtAuth", () => {
     seedEnv();
   });
 
-  it("sets meals profile id and auth user id from a valid Bearer token", async () => {
+  it("sets profile id and auth user id from the token sub claim", async () => {
     const token = await signAccessToken({});
     const app = createTestApp();
     const res = await app.request("/api/recommendations", {
@@ -83,7 +79,35 @@ describe("supabaseJwtAuth", () => {
     });
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
-      userId: MEALS_PROFILE_ID,
+      userId: AUTH_USER_ID,
+      authUserId: AUTH_USER_ID,
+    });
+  });
+
+  it("uses sub as the profile id when meals_profile_id is absent", async () => {
+    const token = await signAccessToken({ userMetadata: {} });
+    const app = createTestApp();
+    const res = await app.request("/api/recommendations", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      userId: AUTH_USER_ID,
+      authUserId: AUTH_USER_ID,
+    });
+  });
+
+  it("ignores user_metadata.meals_profile_id and keeps sub", async () => {
+    const token = await signAccessToken({
+      userMetadata: { meals_profile_id: "22222222-2222-4222-8222-222222222222" },
+    });
+    const app = createTestApp();
+    const res = await app.request("/api/recommendations", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      userId: AUTH_USER_ID,
       authUserId: AUTH_USER_ID,
     });
   });
@@ -96,15 +120,15 @@ describe("supabaseJwtAuth", () => {
     expect(body.error).toMatch(/Bearer/i);
   });
 
-  it("returns 401 when meals_profile_id is missing", async () => {
-    const token = await signAccessToken({ mealsProfileId: null });
+  it("returns 401 when sub is missing", async () => {
+    const token = await signAccessToken({ sub: null });
     const app = createTestApp();
     const res = await app.request("/api/recommendations", {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(res.status).toBe(401);
     const body = (await res.json()) as { error: string };
-    expect(body.error).toMatch(/meals_profile_id/i);
+    expect(body.error).toMatch(/subject/i);
   });
 
   it("returns 403 when profile path id does not match token", async () => {
@@ -122,7 +146,7 @@ describe("supabaseJwtAuth", () => {
   it("allows matching profile path with a valid token", async () => {
     const token = await signAccessToken({});
     const app = createTestApp();
-    const res = await app.request(`/api/profiles/${MEALS_PROFILE_ID}`, {
+    const res = await app.request(`/api/profiles/${AUTH_USER_ID}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(res.status).toBe(200);

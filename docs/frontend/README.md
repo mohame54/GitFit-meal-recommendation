@@ -48,16 +48,13 @@ CORS allows `Authorization`, `Content-Type`, and `X-Api-Key`. Set `CORS_ORIGINS`
 
 ### Identity
 
-User routes require `Authorization: Bearer <Supabase access token>`. The server verifies the JWT and reads:
+User routes require `Authorization: Bearer <Supabase access token>`. The server verifies the JWT and uses `sub` — the signed-in user's id — as the meals profile id for all user-scoped data.
 
-- `sub` — Supabase Auth user id
-- `user_metadata.meals_profile_id` — meals profile id used for all user-scoped data
-
-`X-User-Id` is no longer accepted. Optional body/query `userId` must match the token profile id when present (otherwise `403`).
+`X-User-Id` is no longer accepted. Optional body/query `userId` must match `sub` when present (otherwise `403`).
 
 `POST /api/profiles` is a service-key path used by the auth Edge Function before a user session exists. It does not require a Bearer token (only `X-Api-Key` when `API_KEY` is set).
 
-`GET` / `PATCH /api/profiles/{userId}` require the path id to equal `meals_profile_id` or the API returns `403`.
+`GET` / `PATCH /api/profiles/{userId}` require the path id to equal `sub` or the API returns `403`. Use `session.user.id` as that path id.
 
 Seeded demo user (after `supabase/seed/seed.sql`): `00000000-0000-0000-0000-000000000001` (still useful for local DB rows; browser clients must send a real Supabase JWT).
 
@@ -78,7 +75,7 @@ Local demos usually leave `API_KEY` unset, so the header is optional.
 | Status | When | Body |
 |--------|------|------|
 | `400` | Invalid JSON or failed validation | `{ "error": "..." }` |
-| `401` | Missing/invalid Bearer token, missing `meals_profile_id`, or bad `X-Api-Key` | `{ "error": "..." }` |
+| `401` | Missing/invalid Bearer token, missing `sub`, or bad `X-Api-Key` | `{ "error": "..." }` |
 | `403` | Profile path or body/query `userId` does not match the token | `{ "error": "..." }` |
 | `404` | Profile or recipe does not exist | `{ "error": "..." }` |
 | `404` | Path does not exist | `{ "message": "Not Found - /the/path" }` |
@@ -127,7 +124,7 @@ Responses use snake_case (`display_name`, `ready_in_minutes`, `constraint_type`)
 }
 ```
 
-Use the returned `id` as `user_metadata.meals_profile_id` on the Supabase user (done by the auth Edge Function). Browser calls send the access token; the path uses that profile id.
+Browser calls send the access token. Use `session.user.id` (`sub`) as the profile id in paths and optional `userId` fields.
 
 ### Read
 
@@ -184,7 +181,7 @@ Same `(constraint_type, value)` for a user updates the existing row instead of c
 }
 ```
 
-`userId` in the body is optional; when present it must match the token's `meals_profile_id`.
+`userId` in the body is optional; when present it must match the token's `sub`.
 
 ### Delete
 
@@ -298,7 +295,7 @@ Catalog ingest (`POST /api/recipes/ingest/ids`, `/random`, `/search`) fills the 
 
 `GET /api/recommendations?limit=5` → `200`
 
-`limit` defaults to 10. Identity comes from the Bearer token; omit query `userId` or keep it equal to `meals_profile_id`.
+`limit` defaults to 10. Identity comes from the Bearer token; omit query `userId` or keep it equal to `sub`.
 
 ```json
 [
